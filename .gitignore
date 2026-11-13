@@ -1,0 +1,7 @@
+.build/
+.swiftpm/
+dist/
+private/
+*.xcodeproj
+.DS_Store
+.idea/
