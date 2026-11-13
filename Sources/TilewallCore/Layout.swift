@@ -5,7 +5,7 @@ import Foundation
 public enum Orientation: String, Codable, Equatable {
     /// Rows: the focused row grows taller, and only the tiles in that row change width.
     case landscape
-    /// Columns: the focused column grows wider, and only the tiles in that column change height.
+    /// Same slots, opposite rule: the focused column grows wider, and only the tiles in that column change height.
     case portrait
 }
 
@@ -112,20 +112,60 @@ public enum Layout {
         return result
     }
 
-    /// Lays out and places `count` tiles in `area`, honouring the orientation.
+    /// The portrait layout, grouped by column, left to right. Each entry carries the tile's index in window order.
     ///
-    /// Portrait is the landscape layout with the two axes swapped: tiles run down columns instead of along rows.
+    /// Every tile keeps the slot it has in landscape (same row, same position in the row), so switching
+    /// orientation does not shuffle windows. What changes is the rule: the focused column grows wider,
+    /// and only the tiles in that column change height. The other columns keep even heights and just get narrower.
+    public static func columns(count: Int, focused: Int?, area: CGRect, options: LayoutOptions = .init()) -> [[(index: Int, frame: CGRect)]] {
+        guard count > 0 else { return [] }
+        let half = options.gap / 2
+        let inner = area.insetBy(dx: half, dy: half)
+        let rows = rowCounts(count: count, size: inner.size, targetAspect: options.targetAspect)
+        let focus = focused.flatMap { $0 >= 0 && $0 < count ? $0 : nil }
+
+        // Column c holds the tile at position c of every row that is long enough.
+        var members: [[Int]] = Array(repeating: [], count: rows.max() ?? 0)
+        var start = 0
+        for n in rows {
+            for c in 0..<n { members[c].append(start + c) }
+            start += n
+        }
+        let focusColumn = focus.flatMap { f in members.firstIndex { $0.contains(f) } }
+        let widths = split(length: inner.width, count: members.count, focused: focusColumn, fraction: options.focusFraction)
+
+        var result: [[(index: Int, frame: CGRect)]] = []
+        var x = Double(inner.minX)
+        for (c, column) in members.enumerated() {
+            let focusInColumn = c == focusColumn ? focus.flatMap { column.firstIndex(of: $0) } : nil
+            let heights = split(length: inner.height, count: column.count, focused: focusInColumn, fraction: options.focusFraction)
+            var tiles: [(index: Int, frame: CGRect)] = []
+            var y = Double(inner.minY)
+            for (i, index) in column.enumerated() {
+                let left = (x + half).rounded()
+                let top = (y + half).rounded()
+                let right = (x + widths[c] - half).rounded()
+                let bottom = (y + heights[i] - half).rounded()
+                tiles.append((index, CGRect(x: left, y: top, width: max(right - left, 1), height: max(bottom - top, 1))))
+                y += heights[i]
+            }
+            result.append(tiles)
+            x += widths[c]
+        }
+        return result
+    }
+
+    /// Lays out and places `count` tiles in `area`, honouring the orientation.
     /// `place` receives the tile index and the wanted frame, applies it, and returns the size the window ended up with.
     public static func arrange(count: Int, focused: Int?, area: CGRect, options: LayoutOptions, place: (Int, CGRect) -> CGSize) {
         guard options.orientation == .portrait else {
             return pack(rows: rows(count: count, focused: focused, area: area, options: options), gap: options.gap, place: place)
         }
-        var swapped = options
-        swapped.orientation = .landscape
-        swapped.targetAspect = options.targetAspect > 0 ? 1 / options.targetAspect : options.targetAspect
-        let flipped = rows(count: count, focused: focused, area: transpose(area), options: swapped)
-        pack(rows: flipped, gap: options.gap) { index, wanted in
-            let actual = place(index, transpose(wanted))
+        // Packing works along rows, so hand it the columns with the two axes swapped.
+        let columns = columns(count: count, focused: focused, area: area, options: options)
+        let order = columns.flatMap { $0.map(\.index) }
+        pack(rows: columns.map { $0.map { transpose($0.frame) } }, gap: options.gap) { position, wanted in
+            let actual = place(order[position], transpose(wanted))
             return CGSize(width: actual.height, height: actual.width)
         }
     }

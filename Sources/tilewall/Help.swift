@@ -3,14 +3,14 @@ import TilewallCore
 
 /// The actions a hotkey can trigger, in the order they are shown.
 let hotkeyActions: [(name: String, title: String, detail: String)] = [
-    ("toggle", "Include or Exclude Focused Window", "Adds the focused window to the tilewall, or takes it out."),
+    ("toggle", "Include or Exclude Focused Window", "Adds the focused window to the tiles, or takes it out."),
     ("next", "Focus Next Tile", "Moves focus to the next tile, which then grows."),
     ("prev", "Focus Previous Tile", "Moves focus to the previous tile."),
     ("fill", "Fill Screen", "Puts every group back to filling its whole screen."),
     ("send", "Send Tile to Next Display", "Moves the focused tile to the group on the next display."),
     ("retile", "Retile Now", "Lays the tiles out again."),
     ("pause", "Pause or Resume Tiling", "While paused, windows stay wherever you put them."),
-    ("help", "Help", "Shows this window."),
+    ("help", "Help", "Opens a window that explains Tilewall and lists the hotkeys."),
 ]
 
 final class HelpWindow {
@@ -29,7 +29,7 @@ final class HelpWindow {
     private func makeWindow() -> NSWindow {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 640),
                               styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
-        window.title = "tilewall Help"
+        window.title = "Tilewall Help"
         window.isReleasedWhenClosed = false
         let scroll = NSTextView.scrollableTextView()
         scroll.frame = window.contentView!.bounds
@@ -59,8 +59,8 @@ final class HelpWindow {
             add(string + "\n", font: .systemFont(ofSize: 15, weight: .semibold), style: style)
         }
 
-        heading("What tilewall does")
-        add("tilewall arranges windows as tiles in a grid, so you can watch all of them at once. ")
+        heading("What Tilewall does")
+        add("Tilewall arranges windows as tiles in a grid, so you can watch all of them at once. ")
         add("The focused tile grows to a quarter of the group. The other tiles keep their place and shrink.\n")
         add("Click a tile, or use the hotkeys below, to choose which one is large.\n")
 
@@ -98,7 +98,7 @@ final class HelpWindow {
         add(" in a terminal for the command line.\n")
 
         heading("About")
-        add("tilewall \(App.version) is free and open source: \(App.sourceURL)\n")
+        add("Tilewall \(App.version) is free and open source: \(App.sourceURL)\n")
         if !App.supportURL.isEmpty { add("If it is useful to you, you can support it: \(App.supportURL)\n") }
         return out
     }

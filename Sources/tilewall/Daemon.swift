@@ -151,12 +151,18 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
+
+        /// Adds one item. `hint` is shown when the pointer rests on it, `hotkey` shows the global shortcut on the right.
         @discardableResult
-        func add(_ title: String, _ action: Selector, hotkey: String? = nil, tag: Int = 0) -> NSMenuItem {
+        func add(_ title: String, symbol: String? = nil, hint: String, action: Selector, hotkey: String? = nil,
+                 on: Bool = false, tag: Int = 0, payload: String? = nil) -> NSMenuItem {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
             item.target = self
             item.tag = tag
-            // Shows the global hotkey next to the item, the same way app menus show shortcuts.
+            item.representedObject = payload
+            item.toolTip = hint
+            item.state = on ? .on : .off
+            if let symbol { item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) }
             if let hotkey, let combo = KeyCombo(manager.config.hotkeys[hotkey] ?? ""), let key = Daemon.keyEquivalent(combo.key) {
                 item.keyEquivalent = key
                 var mask: NSEvent.ModifierFlags = []
@@ -169,30 +175,52 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(item)
             return item
         }
-        func title(_ name: String) -> String { hotkeyActions.first { $0.name == name }!.title }
-
-        let version = NSMenuItem(title: "tilewall \(App.version)", action: nil, keyEquivalent: "")
-        version.isEnabled = false
-        menu.addItem(version)
-        menu.addItem(.separator())
-        add("Tile All", #selector(tileAll))
-        add("Untile All", #selector(untileAll))
-        add(title("toggle"), #selector(menuAction(_:)), hotkey: "toggle").representedObject = "toggle"
-        add(title("next"), #selector(menuAction(_:)), hotkey: "next").representedObject = "next"
-        add(title("prev"), #selector(menuAction(_:)), hotkey: "prev").representedObject = "prev"
-        if NSScreen.screens.count > 1 {
-            add(title("send"), #selector(menuAction(_:)), hotkey: "send").representedObject = "send"
+        /// An item for one of the hotkey actions, with its title and hint taken from the shared list.
+        func addAction(_ name: String, symbol: String, title: String? = nil, on: Bool = false) {
+            let action = hotkeyActions.first { $0.name == name }!
+            add(title ?? action.title, symbol: symbol, hint: action.detail, action: #selector(menuAction(_:)), hotkey: name, on: on, payload: name)
         }
-        menu.addItem(.separator())
-        add(title("fill"), #selector(menuAction(_:)), hotkey: "fill").representedObject = "fill"
-        add(title("retile"), #selector(menuAction(_:)), hotkey: "retile").representedObject = "retile"
-        add(manager.paused ? "Resume Tiling" : "Pause Tiling", #selector(menuAction(_:)), hotkey: "pause").representedObject = "pause"
-        add("Portrait Layout", #selector(toggleOrientation)).state = manager.config.orientation == .portrait ? .on : .off
-        add("Split Tabs Into Windows", #selector(untabNow))
-        add("Square Window Corners", #selector(toggleCorners)).state = Corners.isSquare ? .on : .off
-        menu.addItem(.separator())
+        func section(_ title: String) {
+            menu.addItem(.separator())
+            if #available(macOS 14.0, *) {
+                menu.addItem(.sectionHeader(title: title))
+            } else {
+                let header = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+                header.isEnabled = false
+                menu.addItem(header)
+            }
+        }
 
         menuWindows = manager.managedWindows()
+        let state = manager.paused ? "paused" : "\(menuWindows.count) tile\(menuWindows.count == 1 ? "" : "s")"
+        let header = NSMenuItem(title: "Tilewall \(App.version), \(state)", action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        menu.addItem(header)
+
+        section("Tiles")
+        add("Tile All", symbol: "square.grid.2x2", hint: "Tiles every window the rules match and undoes all manual excludes. Also resumes tiling.",
+            action: #selector(tileAll))
+        add("Untile All", symbol: "square.dashed", hint: "Releases every tile on this space. The windows stay where they are and can be moved freely.",
+            action: #selector(untileAll))
+        addAction("toggle", symbol: "plus.forwardslash.minus")
+        addAction("next", symbol: "arrow.right")
+        addAction("prev", symbol: "arrow.left")
+        if NSScreen.screens.count > 1 { addAction("send", symbol: "display.2") }
+
+        section("Layout")
+        addAction("fill", symbol: "arrow.up.left.and.arrow.down.right")
+        addAction("retile", symbol: "arrow.clockwise")
+        add("Portrait Layout", symbol: "rectangle.portrait",
+            hint: "Off: the focused row grows taller and only its tiles change width. On: the focused column grows wider and only its tiles change height.",
+            action: #selector(toggleOrientation), on: manager.config.orientation == .portrait)
+        add("Square Window Corners", symbol: "square",
+            hint: "Experimental. Uses an undocumented macOS setting, applies to every app, and only shows after an app is restarted.",
+            action: #selector(toggleCorners), on: Corners.isSquare)
+        add("Split Tabs Into Windows", symbol: "rectangle.split.3x1",
+            hint: "Moves every tab of the tiled apps into its own window, because only windows can be tiles.", action: #selector(untabNow))
+        addAction("pause", symbol: manager.paused ? "play" : "pause", title: manager.paused ? "Resume Tiling" : "Pause Tiling")
+
+        section("Windows")
         if menuWindows.isEmpty {
             let empty = NSMenuItem(title: "No tiles on this space", action: nil, keyEquivalent: "")
             empty.isEnabled = false
@@ -201,16 +229,21 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let focused = manager.focusedWindow()?.id
         let oneApp = Set(menuWindows.map(\.app)).count == 1
         for (i, w) in menuWindows.enumerated() {
-            let item = add(Daemon.menuTitle(for: w, withApp: !oneApp), #selector(focusTile(_:)), tag: i)
-            item.state = w.id == focused ? .on : .off
-            item.toolTip = "\(w.app): \(w.title)"
+            add(Daemon.menuTitle(for: w, withApp: !oneApp), symbol: "macwindow",
+                hint: "Focus this tile.\n\(w.app): \(w.title)", action: #selector(focusTile(_:)), on: w.id == focused, tag: i)
+        }
+
+        menu.addItem(.separator())
+        addAction("help", symbol: "questionmark.circle", title: "Tilewall Help")
+        if !App.supportURL.isEmpty {
+            add("Support Tilewall…", symbol: "heart", hint: "Tilewall is free. This opens a page where you can support its development.", action: #selector(openSupport))
+        }
+        add("Reload Config", symbol: "arrow.triangle.2.circlepath", hint: "Reads \(Paths.config.path) again after you edited it.", action: #selector(reloadConfig))
+        if App.isBundled {
+            add("Launch at Login", symbol: "power", hint: "Starts Tilewall when you log in.", action: #selector(toggleLogin), on: App.launchesAtLogin)
         }
         menu.addItem(.separator())
-        add("tilewall Help", #selector(menuAction(_:)), hotkey: "help").representedObject = "help"
-        if !App.supportURL.isEmpty { add("Support tilewall…", #selector(openSupport)) }
-        add("Reload Config", #selector(reloadConfig))
-        if App.isBundled { add("Launch at Login", #selector(toggleLogin)).state = App.launchesAtLogin ? .on : .off }
-        add("Quit tilewall", #selector(quit))
+        add("Quit Tilewall", hint: "Stops tiling. Windows stay where they are.", action: #selector(quit))
     }
 
     /// Menu titles are cut in the middle, because window titles tend to differ at the start and at the end.

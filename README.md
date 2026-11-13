@@ -8,7 +8,8 @@ The other windows stay in their slots and shrink, so nothing jumps around when f
 
 In the default landscape layout the tiles run in rows.
 The focused row grows taller, and only the tiles in that row change width, so the other rows keep their widths and just get shorter.
-The portrait layout swaps the axes: tiles run in columns, the focused column grows wider, and the other columns only get narrower.
+The portrait layout keeps every window in the same slot and flips the rule: the focused column grows wider, and only the tiles in that column change height.
+The other columns keep their heights and just get narrower.
 
 It arranges the windows you already have.
 Your agents keep running in Terminal, tmux, or any other app, and tilewall only moves and resizes their windows.
@@ -66,7 +67,7 @@ tilewall none             # release every tile on the current space
 tilewall toggle           # include or exclude the focused window
 tilewall toggle 9154      # the same for a window id from `tilewall status --all`
 tilewall focus next       # also: prev, or a window id
-tilewall orientation portrait   # tiles in columns, or `landscape` for rows; also Portrait Layout in the menu
+tilewall orientation portrait   # the focused column grows instead of the focused row; `landscape` switches back
 tilewall fill             # make every group fill its screen again
 tilewall area -1700 100 1200 700   # place the focused group: x y width height, from the top left of the main display
 tilewall send             # move the focused tile to the group of the next display
@@ -87,6 +88,7 @@ A tab is not a window, so tabbed sessions must be split first.
 `tilewall untab` does that through the app's own "Move Tab to New Window" menu item.
 
 The menu bar icon offers the same actions and lists the tiles of the current space.
+Rest the pointer on a menu item to see what it does.
 
 ## Square window corners (experimental)
 
@@ -146,7 +148,7 @@ Run `tilewall reload` after editing it.
   macOS rounds the corners of every window and gives other apps no way to switch that off.
   The backdrop fills the notches those corners leave, so with a color that matches the windows the corners disappear.
   Use `"#rrggbb"`, `"auto"` to follow the light or dark system appearance, or `"none"` to turn it off.
-- `orientation`: `"landscape"` lays tiles out in rows, `"portrait"` in columns.
+- `orientation`: `"landscape"` grows the focused row, `"portrait"` grows the focused column.
 - An empty hotkey string disables that hotkey.
 
 Any window of any app can be tiled by hand with `tilewall toggle`, whether a rule matches it or not.

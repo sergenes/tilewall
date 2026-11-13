@@ -75,30 +75,58 @@ final class LayoutTests: XCTestCase {
         XCTAssertEqual(focused[1][1].height, screen.height / 2, accuracy: 1)
     }
 
-    func testPortraitIsTheLandscapeLayoutWithSwappedAxes() {
-        let area = CGRect(x: 100, y: 50, width: 1600, height: 1000)
-        var placed: [CGRect] = Array(repeating: .zero, count: 12)
+    private func portraitFrames(count: Int, focused: Int?, area: CGRect) -> [CGRect] {
+        var placed: [CGRect] = Array(repeating: .zero, count: count)
         let portrait = LayoutOptions(focusFraction: 0.5, gap: 0, targetAspect: 1.5, orientation: .portrait)
-        Layout.arrange(count: 12, focused: 5, area: area, options: portrait) { index, wanted in
+        Layout.arrange(count: count, focused: focused, area: area, options: portrait) { index, wanted in
             placed[index] = wanted
             return wanted.size
         }
-        let total = placed.reduce(0.0) { $0 + Double($1.width * $1.height) }
-        XCTAssertEqual(total, Double(area.width * area.height), accuracy: 1)
-        for (i, a) in placed.enumerated() {
-            XCTAssertTrue(area.contains(a))
-            for b in placed[(i + 1)...] { XCTAssertTrue(a.intersection(b).isEmpty || a.intersection(b).width * a.intersection(b).height == 0) }
+        return placed
+    }
+
+    func testPortraitCoversTheAreaAndGivesTheFocusedTileAQuarter() {
+        for n in 4...30 {
+            for focus in 0..<n {
+                let placed = portraitFrames(count: n, focused: focus, area: screen)
+                let total = placed.reduce(0.0) { $0 + Double($1.width * $1.height) }
+                XCTAssertEqual(total, Double(screen.width * screen.height), accuracy: 1, "n=\(n)")
+                for (i, a) in placed.enumerated() {
+                    XCTAssertTrue(screen.contains(a))
+                    for b in placed[(i + 1)...] {
+                        let overlap = a.intersection(b)
+                        XCTAssertTrue(overlap.isNull || overlap.width * overlap.height == 0, "n=\(n) focus=\(focus)")
+                    }
+                }
+                XCTAssertEqual(placed[focus].width, screen.width / 2, accuracy: 1, "n=\(n) focus=\(focus)")
+                // A column with one tile has nothing to share its height with.
+                let alone = placed.filter { $0.minX == placed[focus].minX }.count == 1
+                XCTAssertEqual(placed[focus].height, alone ? screen.height : screen.height / 2, accuracy: 1, "n=\(n) focus=\(focus)")
+            }
         }
-        XCTAssertEqual(placed[5].width, area.width / 2, accuracy: 1)
-        XCTAssertEqual(placed[5].height, area.height / 2, accuracy: 1)
-        // Tiles run down columns: the first two share a column, and only the focused column has uneven heights.
-        XCTAssertEqual(placed[0].minX, placed[1].minX)
-        XCTAssertEqual(placed[1].minY, placed[0].maxY)
-        let columns = Dictionary(grouping: placed, by: \.minX)
-        for (x, tiles) in columns where x != placed[5].minX {
-            // Even up to the one point that rounding to whole points can cost.
-            XCTAssertLessThanOrEqual(tiles.map(\.height).max()! - tiles.map(\.height).min()!, 1, "column at \(x) keeps even heights")
+    }
+
+    func testPortraitKeepsTheLandscapeSlotsAndOnlyTheFocusedColumnChangesHeight() {
+        // Nine tiles are a 3 by 3 grid. Tile 4 is the middle one.
+        let landscape = Layout.frames(count: 9, focused: 4, area: screen, options: noGap)
+        let even = portraitFrames(count: 9, focused: nil, area: screen)
+        let portrait = portraitFrames(count: 9, focused: 4, area: screen)
+        // Same slot in both orientations: the window left of, or above, another one stays there.
+        for i in 0..<9 {
+            for j in 0..<9 where i != j {
+                if landscape[i].maxX <= landscape[j].minX && i / 3 == j / 3 { XCTAssertLessThanOrEqual(portrait[i].maxX, portrait[j].minX) }
+                if landscape[i].maxY <= landscape[j].minY && i % 3 == j % 3 { XCTAssertLessThanOrEqual(portrait[i].maxY, portrait[j].minY) }
+            }
         }
+        // Columns 0 and 2 keep their heights and only get narrower.
+        for i in [0, 3, 6, 2, 5, 8] {
+            XCTAssertEqual(portrait[i].height, even[i].height, "tile \(i) keeps its height")
+            XCTAssertEqual(portrait[i].minY, even[i].minY)
+            XCTAssertLessThan(portrait[i].width, even[i].width)
+        }
+        XCTAssertEqual(portrait[4].size.width, screen.width / 2, accuracy: 1)
+        XCTAssertEqual(portrait[4].size.height, screen.height / 2, accuracy: 1)
+        XCTAssertEqual(portrait[1].height, screen.height / 4, accuracy: 1)
     }
 
     func testGapSeparatesTilesAndEdges() {
