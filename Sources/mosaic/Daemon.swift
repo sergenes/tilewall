@@ -166,6 +166,10 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         func title(_ name: String) -> String { hotkeyActions.first { $0.name == name }!.title }
 
+        let version = NSMenuItem(title: "mosaic \(App.version)", action: nil, keyEquivalent: "")
+        version.isEnabled = false
+        menu.addItem(version)
+        menu.addItem(.separator())
         add("Mosaic All", #selector(mosaicAll))
         add("Unmosaic All", #selector(unmosaicAll))
         add(title("toggle"), #selector(menuAction(_:)), hotkey: "toggle").representedObject = "toggle"

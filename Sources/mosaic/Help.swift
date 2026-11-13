@@ -75,6 +75,7 @@ final class HelpWindow {
         add("Drag any tile by its title bar to move the whole group.\n")
         add("Resize any tile by an edge or corner to scale the whole group, for example to see the desktop behind it.\n")
         add("Fill Screen puts the group back to full size.\n")
+        add("Drop the group on another display and it fills that screen.\n")
         add("Each display has its own group. Send Tile to Next Display moves a tile between them.\n")
 
         heading("Hotkeys")

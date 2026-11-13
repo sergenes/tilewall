@@ -45,10 +45,9 @@ A binary started from a terminal uses that terminal's Accessibility permission.
 
 - Square window corners are experimental.
   They depend on an undocumented macOS default, described below, that Apple can remove in any release.
-- Restarting Terminal to apply the corners can end your sessions.
-  When this was tried on the machine mosaic was developed on, the tmux server went away with Terminal and every agent session in it was lost.
-  The cause was not found.
-  Save or finish what is running before you quit Terminal, and do not count on tmux to carry sessions across the restart.
+- Applying the corners means quitting and reopening each app, which closes its windows.
+  For Terminal that ends every shell that is not inside tmux.
+  Whether tmux sessions survive a Terminal restart has not been tested with mosaic, so save or finish what is running first.
 - mosaic uses one private macOS function, `_AXUIElementGetWindow`, to tell windows apart.
   Other macOS tilers depend on the same function, but it is not a public API.
 
@@ -73,6 +72,7 @@ mosaic pause            # also: resume, retile, reload, stop
 
 The tiles of a display form a group.
 Drag any tile by its title bar and the whole group moves with it.
+Drop it on another display and the group moves to that display and fills its screen.
 Resize any tile by its edge or corner and the whole group scales by the same factor when the mouse is released.
 A group is never larger than its screen and never above the top of the desktop.
 A moved or resized group stays where it was put, also after a restart, until `mosaic fill` puts it back to full screen.

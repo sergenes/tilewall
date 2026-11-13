@@ -242,7 +242,7 @@ final class WindowManager {
         var groups = tiles()
         if userChangedTile {
             userChangedTile = false
-            if adoptUserResize(focus: focus, in: groups) { groups = tiles() }
+            if adoptDropOnOtherDisplay(focus: focus, in: groups) || adoptUserResize(focus: focus, in: groups) { groups = tiles() }
         }
         raiseGroupIfEntered(focus: focus, groups: groups)
         var alive: Set<CGWindowID> = []
@@ -311,6 +311,25 @@ final class WindowManager {
             }
         }
         refreshBackdrop()
+    }
+
+    /// After the button is released: a group dropped on another display moves there and fills that screen.
+    private func adoptDropOnOtherDisplay(focus: CGWindowID?, in groups: [Group]) -> Bool {
+        guard let focus, let group = groups.first(where: { g in g.windows.contains { $0.id == focus } }),
+              let primary = NSScreen.screens.first else { return false }
+        let mouse = NSEvent.mouseLocation
+        let drop = CGPoint(x: mouse.x, y: primary.frame.maxY - mouse.y)
+        let screens = screenAreas()
+        guard let target = screens.first(where: { $0.area.contains(drop) })
+                ?? screens.min(by: { distance(drop, to: $0.area) < distance(drop, to: $1.area) }),
+              target.id != group.screen else { return false }
+        for window in group.windows { homes[window.id] = target.id }
+        // Both screens go back to full size: the tiles join whatever is already tiled on the target.
+        areas[group.screen] = nil
+        areas[target.id] = nil
+        applied.removeAll()
+        save()
+        return true
     }
 
     /// After the button is released: a tile the user resized rescales its whole group. Returns true when an area changed.
