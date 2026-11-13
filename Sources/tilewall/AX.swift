@@ -66,12 +66,21 @@ extension AXUIElement {
     }
 }
 
-/// Usable area of every screen in accessibility coordinates, keyed by display id.
-func screenAreas() -> [(id: CGDirectDisplayID, area: CGRect)] {
+/// A connected display. `id` is the display's UUID, which stays the same when it is unplugged and plugged in again.
+struct Display {
+    let id: String
+    let name: String
+    /// Usable area in accessibility coordinates.
+    let area: CGRect
+}
+
+func screenAreas() -> [Display] {
     guard let primary = NSScreen.screens.first else { return [] }
     return NSScreen.screens.compactMap { screen in
-        guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else { return nil }
+        guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber,
+              let uuid = CGDisplayCreateUUIDFromDisplayID(number.uint32Value)?.takeRetainedValue() else { return nil }
         let v = screen.visibleFrame
-        return (number.uint32Value, CGRect(x: v.minX, y: primary.frame.maxY - v.maxY, width: v.width, height: v.height))
+        return Display(id: CFUUIDCreateString(nil, uuid) as String, name: screen.localizedName,
+                       area: CGRect(x: v.minX, y: primary.frame.maxY - v.maxY, width: v.width, height: v.height))
     }
 }

@@ -7,6 +7,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let hotkeys = Hotkeys()
     private var statusItem: NSStatusItem!
     private var menuWindows: [Window] = []
+    private var menuDisplays: [String] = []
     private let help = HelpWindow()
 
     static func run() -> Never {
@@ -109,6 +110,13 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 return reply(parts.count == 1 ? "orientation: \(manager.config.orientation.rawValue)" : "error: usage: tilewall orientation [landscape|portrait]")
             }
             reply(manager.setOrientation(orientation))
+        case "display", "displays":
+            let displays = manager.displays()
+            guard parts.count == 3, let number = Int(parts[1]), displays.indices.contains(number - 1), ["on", "off"].contains(parts[2]) else {
+                guard parts.count == 1 else { return reply("error: usage: tilewall display [<number> on|off]") }
+                return reply(displays.enumerated().map { "\($0 + 1)  \($1.name)  tiling \($1.tiled ? "on, \($1.tiles) tiles" : "off")" }.joined(separator: "\n"))
+            }
+            reply(manager.setTiled(parts[2] == "on", display: displays[number - 1].id))
         case "all": reply(manager.tileAll())
         case "none": reply(manager.untileAll())
         case "fill": reply(manager.fillScreens())
@@ -191,8 +199,8 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
 
-        menuWindows = manager.managedWindows()
-        let state = manager.paused ? "paused" : "\(menuWindows.count) tile\(menuWindows.count == 1 ? "" : "s")"
+        let tileCount = manager.managedWindows().count
+        let state = manager.paused ? "paused" : "\(tileCount) tile\(tileCount == 1 ? "" : "s")"
         let header = NSMenuItem(title: "Tilewall \(App.version), \(state)", action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
@@ -220,17 +228,37 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             hint: "Moves every tab of the tiled apps into its own window, because only windows can be tiles.", action: #selector(untabNow))
         addAction("pause", symbol: manager.paused ? "play" : "pause", title: manager.paused ? "Resume Tiling" : "Pause Tiling")
 
-        section("Windows")
-        if menuWindows.isEmpty {
+        let displays = manager.displays()
+        menuDisplays = displays.map(\.id)
+        if displays.count > 1 {
+            section("Displays")
+            for (i, display) in displays.enumerated() {
+                add("Tile \(display.name)", symbol: "display",
+                    hint: display.tiled ? "On: windows on this display are tiled. Switch off to leave them exactly where they are."
+                                        : "Off: windows on this display are left alone, also while it is unplugged and they sit on another screen.",
+                    action: #selector(toggleDisplay(_:)), on: display.tiled, tag: i)
+            }
+        }
+
+        let groups = manager.displayGroups()
+        menuWindows = groups.flatMap(\.windows)
+        let focused = manager.focusedWindow()?.id
+        let oneApp = Set(menuWindows.map(\.app)).count == 1
+        if groups.isEmpty {
+            section("Windows")
             let empty = NSMenuItem(title: "No tiles on this space", action: nil, keyEquivalent: "")
             empty.isEnabled = false
             menu.addItem(empty)
         }
-        let focused = manager.focusedWindow()?.id
-        let oneApp = Set(menuWindows.map(\.app)).count == 1
-        for (i, w) in menuWindows.enumerated() {
-            add(Daemon.menuTitle(for: w, withApp: !oneApp), symbol: "macwindow",
-                hint: "Focus this tile.\n\(w.app): \(w.title)", action: #selector(focusTile(_:)), on: w.id == focused, tag: i)
+        var index = 0
+        for group in groups {
+            // One list per display, so it is clear which group a tile is in.
+            section(groups.count > 1 ? "Windows on \(group.name)" : "Windows")
+            for w in group.windows {
+                add(Daemon.menuTitle(for: w, withApp: !oneApp), symbol: "macwindow",
+                    hint: "Focus this tile.\n\(w.app): \(w.title)", action: #selector(focusTile(_:)), on: w.id == focused, tag: index)
+                index += 1
+            }
         }
 
         menu.addItem(.separator())
@@ -283,6 +311,10 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     @objc private func openSupport() { URL(string: App.supportURL).map { _ = NSWorkspace.shared.open($0) } }
     @objc private func toggleLogin() { App.launchesAtLogin.toggle() }
+    @objc private func toggleDisplay(_ sender: NSMenuItem) {
+        guard menuDisplays.indices.contains(sender.tag) else { return }
+        log(manager.setTiled(sender.state != .on, display: menuDisplays[sender.tag]))
+    }
     @objc private func toggleOrientation() {
         log(manager.setOrientation(manager.config.orientation == .portrait ? .landscape : .portrait))
     }

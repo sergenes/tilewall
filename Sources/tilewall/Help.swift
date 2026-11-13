@@ -76,6 +76,7 @@ final class HelpWindow {
         add("Resize any tile by an edge or corner to scale the whole group, for example to see the desktop behind it.\n")
         add("Fill Screen puts the group back to full size.\n")
         add("Drop the group on another display and it fills that screen.\n")
+        add("Tiling can be switched off per display in the menu. Windows there are left alone, also when that display is unplugged.\n")
         add("Each display has its own group. Send Tile to Next Display moves a tile between them.\n")
 
         heading("Hotkeys")

@@ -15,12 +15,16 @@ private struct SavedState: Codable {
     var included: [CGWindowID] = []
     var excluded: [CGWindowID] = []
     var order: [CGWindowID]? = []
-    var areas: [CGDirectDisplayID: CGRect]? = [:]
-    var homes: [CGWindowID: CGDirectDisplayID]? = [:]
+    // Keyed by display UUID. Older state files used numeric display ids under "areas" and "homes", which are ignored.
+    var displayAreas: [String: CGRect]? = [:]
+    var displayHomes: [CGWindowID: String]? = [:]
+    var untiledDisplays: [String]? = []
 }
 
 private struct Group {
-    let screen: CGDirectDisplayID
+    /// UUID of the display this group belongs to.
+    let screen: String
+    let name: String
     /// The rectangle this group fills: the whole screen, or wherever the user dragged it.
     let area: CGRect
     let windows: [Window]
@@ -36,17 +40,19 @@ final class WindowManager {
     private var excluded: Set<CGWindowID> = []
     /// Stable tile order: first seen, first placed.
     private var order: [CGWindowID] = []
-    private var lastFocus: [CGDirectDisplayID: CGWindowID] = [:]
+    private var lastFocus: [String: CGWindowID] = [:]
     private var applied: [CGWindowID: (target: CGRect, result: CGRect)] = [:]
     /// Group areas the user moved or resized. A display without an entry fills its whole visible frame.
-    private var areas: [CGDirectDisplayID: CGRect] = [:]
+    private var areas: [String: CGRect] = [:]
     /// The display whose group a window belongs to. Sticky, so a dragged group keeps its tiles.
-    private var homes: [CGWindowID: CGDirectDisplayID] = [:]
+    private var homes: [CGWindowID: String] = [:]
+    /// Displays the user switched tiling off for. Kept while a display is unplugged.
+    private var untiled: Set<String> = []
     private var lastGroups: [Group] = []
     /// Set while a mouse button is down and the focused tile no longer sits where tilewall put it.
     private var userChangedTile = false
     /// The group that held the focused window at the last retile, nil when focus was outside every group.
-    private var focusedGroup: CGDirectDisplayID?
+    private var focusedGroup: String?
     private let backdrop = Backdrop()
     private static let minGroupSize = CGSize(width: 320, height: 200)
     private var observers: [pid_t: AXObserver] = [:]
@@ -59,8 +65,9 @@ final class WindowManager {
             included = Set(saved.included)
             excluded = Set(saved.excluded)
             order = saved.order ?? []
-            areas = saved.areas ?? [:]
-            homes = saved.homes ?? [:]
+            areas = saved.displayAreas ?? [:]
+            homes = saved.displayHomes ?? [:]
+            untiled = Set(saved.untiledDisplays ?? [])
         }
     }
 
@@ -181,42 +188,46 @@ final class WindowManager {
     }
 
     /// Managed windows grouped by the display they belong to, each group in tile order.
+    /// Windows that belong to a display with tiling switched off are in no group.
     private func tiles() -> [Group] {
         let managed = visibleWindows(candidatesOnly: true).filter(isManaged)
         let known = (order.count, homes)
         for w in managed where !order.contains(w.id) { order.append(w.id) }
         let rank = Dictionary(uniqueKeysWithValues: order.enumerated().map { ($1, $0) })
         let screens = screenAreas()
-        let screenIDs = Set(screens.map(\.id))
+        let connected = Set(screens.map(\.id))
         let desktop = screens.reduce(CGRect.null) { $0.union($1.area) }
-        var clamped: [CGDirectDisplayID: CGRect] = [:]
+        // Areas of unplugged displays are kept, so a group comes back the way it was left.
+        var clamped = areas.filter { !connected.contains($0.key) }
         for screen in screens {
-            guard let area = areas[screen.id] else { continue }
+            guard let area = areas[screen.id], !untiled.contains(screen.id) else { continue }
             clamped[screen.id] = Layout.clamp(area, screen: screen.area, desktop: desktop)
         }
         let areasChanged = clamped != areas
         areas = clamped
-        var groups: [CGDirectDisplayID: [Window]] = [:]
+        var groups: [String: [Window]] = [:]
         for w in managed {
-            if let home = homes[w.id], screenIDs.contains(home) {
-                groups[home, default: []].append(w)
-                continue
-            }
-            guard let frame = w.element.frame, !screens.isEmpty else { continue }
-            let center = CGPoint(x: frame.midX, y: frame.midY)
-            let home = screens.first { $0.area.contains(center) } ?? screens.min {
-                distance(center, to: $0.area) < distance(center, to: $1.area)
-            }!
-            homes[w.id] = home.id
-            groups[home.id, default: []].append(w)
+            guard let current = display(of: w, in: screens) else { continue }
+            let decision = Placement.decide(home: homes[w.id], current: current, connected: connected, untiled: untiled)
+            homes[w.id] = decision.home
+            if case .tile(let display) = decision.placement { groups[display, default: []].append(w) }
         }
         if known != (order.count, homes) || areasChanged { save() }
         lastGroups = screens.compactMap { screen in
             guard let group = groups[screen.id] else { return nil }
-            return Group(screen: screen.id, area: areas[screen.id] ?? screen.area,
+            return Group(screen: screen.id, name: screen.name, area: areas[screen.id] ?? screen.area,
                          windows: group.sorted { (rank[$0.id] ?? 0) < (rank[$1.id] ?? 0) })
         }
         return lastGroups
+    }
+
+    /// The display a window is on right now, judged by its center.
+    private func display(of window: Window, in screens: [Display]) -> String? {
+        guard let frame = window.element.frame, !screens.isEmpty else { return nil }
+        let center = CGPoint(x: frame.midX, y: frame.midY)
+        return (screens.first { $0.area.contains(center) } ?? screens.min {
+            distance(center, to: $0.area) < distance(center, to: $1.area)
+        })?.id
     }
 
     private func distance(_ p: CGPoint, to r: CGRect) -> CGFloat {
@@ -298,7 +309,7 @@ final class WindowManager {
         let dx = now.minX - last.result.minX
         let dy = now.minY - last.result.minY
         areas[group.screen] = group.area.offsetBy(dx: dx, dy: dy)
-        lastGroups = lastGroups.map { $0.screen == group.screen ? Group(screen: $0.screen, area: $0.area.offsetBy(dx: dx, dy: dy), windows: $0.windows) : $0 }
+        lastGroups = lastGroups.map { $0.screen == group.screen ? Group(screen: $0.screen, name: $0.name, area: $0.area.offsetBy(dx: dx, dy: dy), windows: $0.windows) : $0 }
         for window in group.windows {
             guard let previous = applied[window.id] else { continue }
             let moved = (target: previous.target.offsetBy(dx: dx, dy: dy), result: previous.result.offsetBy(dx: dx, dy: dy))
@@ -354,7 +365,8 @@ final class WindowManager {
     }
 
     private func save() {
-        let state = SavedState(included: included.sorted(), excluded: excluded.sorted(), order: order, areas: areas, homes: homes)
+        let state = SavedState(included: included.sorted(), excluded: excluded.sorted(), order: order,
+                               displayAreas: areas, displayHomes: homes, untiledDisplays: untiled.sorted())
         do {
             try FileManager.default.createDirectory(at: Paths.home, withIntermediateDirectories: true)
             try JSONEncoder().encode(state).write(to: Paths.state, options: .atomic)
@@ -484,21 +496,58 @@ final class WindowManager {
         areas[group.screen] = area
         save()
         retile()
-        return "group \(group.screen) at \(describe(area))"
+        return "group on \(group.name) at \(describe(area))"
     }
 
-    /// Moves a tile to the group of the next display.
+    /// Moves a window to the next display. It joins that display's group, or is simply placed there when tiling is off for it.
     func send(id: CGWindowID?) -> String {
         guard let w = id.map({ wanted in visibleWindows().first { $0.id == wanted } }) ?? focusedWindow() else { return "error: no such window" }
         guard isManaged(w) else { return "error: \(w.id) is not a tile" }
-        let screens = screenAreas().map(\.id)
+        let screens = screenAreas()
         guard screens.count > 1 else { return "error: there is only one display" }
-        let current = homes[w.id].flatMap { screens.firstIndex(of: $0) } ?? 0
-        homes[w.id] = screens[(current + 1) % screens.count]
+        // Start from where the window is shown now, which differs from its home while that display is unplugged.
+        let shown = lastGroups.first { g in g.windows.contains { $0.id == w.id } }?.screen ?? display(of: w, in: screens)
+        let current = shown.flatMap { id in screens.firstIndex { $0.id == id } } ?? 0
+        let target = screens[(current + 1) % screens.count]
+        homes[w.id] = target.id
+        if untiled.contains(target.id), let frame = w.element.frame {
+            let size = CGSize(width: min(frame.width, target.area.width), height: min(frame.height, target.area.height))
+            w.element.setFrame(CGRect(x: target.area.midX - size.width / 2, y: target.area.midY - size.height / 2, width: size.width, height: size.height))
+        }
         save()
+        applied.removeAll()
         retile()
-        return "sent \(w.id) to display \(homes[w.id]!)"
+        return "sent \(w.id) to \(target.name)"
     }
+
+    // MARK: Displays
+
+    struct DisplayState {
+        let id: String
+        let name: String
+        let tiled: Bool
+        let tiles: Int
+    }
+
+    func displays() -> [DisplayState] {
+        let groups = tiles()
+        return screenAreas().map { screen in
+            DisplayState(id: screen.id, name: screen.name, tiled: !untiled.contains(screen.id),
+                         tiles: groups.first { $0.screen == screen.id }?.windows.count ?? 0)
+        }
+    }
+
+    /// Switches tiling on or off for one display. Off leaves its windows exactly where they are.
+    func setTiled(_ tiled: Bool, display id: String) -> String {
+        guard let screen = screenAreas().first(where: { $0.id == id }) else { return "error: no such display" }
+        if tiled { untiled.remove(id) } else { untiled.insert(id) }
+        save()
+        applied.removeAll()
+        retile()
+        return "\(screen.name): tiling \(tiled ? "on" : "off")"
+    }
+
+    func displayGroups() -> [(name: String, windows: [Window])] { tiles().map { ($0.name, $0.windows) } }
 
     private func describe(_ r: CGRect) -> String { "\(Int(r.minX)),\(Int(r.minY)) \(Int(r.width))x\(Int(r.height))" }
 
@@ -508,7 +557,7 @@ final class WindowManager {
         var lines = ["tilewall \(paused ? "paused" : "running"), rules: \(rules.joined(separator: ", "))"]
         let groups = tiles()
         for group in groups {
-            lines.append("display \(group.screen), group at \(describe(group.area))\(areas[group.screen] == nil ? " (fills the screen)" : ""): \(group.windows.count) tiles")
+            lines.append("display \(group.name), group at \(describe(group.area))\(areas[group.screen] == nil ? " (fills the screen)" : ""): \(group.windows.count) tiles")
             for w in group.windows {
                 let f = w.element.frame ?? .zero
                 let mark = w.id == focus ? "*" : (w.id == lastFocus[group.screen] ? "+" : " ")
@@ -516,6 +565,7 @@ final class WindowManager {
             }
         }
         if groups.isEmpty { lines.append("no tiles on the current space") }
+        for screen in screenAreas() where untiled.contains(screen.id) { lines.append("display \(screen.name): tiling off") }
         if all {
             let managed = Set(groups.flatMap { $0.windows.map(\.id) })
             lines.append("not tiled:")

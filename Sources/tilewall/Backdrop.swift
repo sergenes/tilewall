@@ -6,10 +6,10 @@ import Cocoa
 /// Where tiles meet, those corners leave small notches that show the desktop.
 /// The backdrop fills the notches with one color, so the group reads as a single slab.
 final class Backdrop {
-    private var windows: [CGDirectDisplayID: NSWindow] = [:]
+    private var windows: [String: NSWindow] = [:]
 
     /// `frame` is in accessibility coordinates, `tiles` are the window ids of the group.
-    func update(_ groups: [(screen: CGDirectDisplayID, frame: CGRect, tiles: [CGWindowID])], color: NSColor?) {
+    func update(_ groups: [(screen: String, frame: CGRect, tiles: [CGWindowID])], color: NSColor?) {
         guard let color, let primary = NSScreen.screens.first else { return hide() }
         let stacking = onScreenOrder()
         for (screen, window) in windows where !groups.contains(where: { $0.screen == screen }) {

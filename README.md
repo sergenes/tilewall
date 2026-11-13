@@ -71,6 +71,8 @@ tilewall orientation portrait   # the focused column grows instead of the focuse
 tilewall fill             # make every group fill its screen again
 tilewall area -1700 100 1200 700   # place the focused group: x y width height, from the top left of the main display
 tilewall send             # move the focused tile to the group of the next display
+tilewall display          # list the displays
+tilewall display 2 off    # leave the windows on display 2 alone; `on` tiles them again
 tilewall pause            # also: resume, retile, reload, stop
 ```
 
@@ -158,6 +160,12 @@ Any window of any app can be tiled by hand with `tilewall toggle`, whether a rul
 - Each display has its own group, and remembers its own focused tile.
 - A window joins the group of the display it is first seen on and stays in it, so a dragged group keeps its tiles.
   Use `tilewall send` to move a tile to another display.
+- Tiling can be switched off per display, in the menu or with `tilewall display <number> off`.
+  Windows that belong to such a display are left exactly where they are.
+  Move one onto a tiled display and it joins the grid there.
+- A window remembers the display it belongs to when that display is unplugged.
+  Until the display returns, a window from a tiled display is tiled on the screen macOS moved it to, and a window from an untiled display stays untouched.
+  When the display is plugged in again its tiles go back to their group.
 - Bringing a whole group to the front works for tiles of the focused app.
   macOS does not let one app raise windows of a background app without activating it.
 - Only the current space is tiled, and windows on other spaces keep their slot.

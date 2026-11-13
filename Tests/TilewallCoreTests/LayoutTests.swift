@@ -221,6 +221,55 @@ final class LayoutTests: XCTestCase {
     }
 }
 
+final class PlacementTests: XCTestCase {
+    let mac = "MACBOOK", ext = "EXTERNAL"
+
+    private func decide(home: String?, current: String, connected: Set<String>, untiled: Set<String> = []) -> (placement: Placement, home: String) {
+        Placement.decide(home: home, current: current, connected: connected, untiled: untiled)
+    }
+
+    func testNewWindowJoinsTheDisplayItAppearsOn() {
+        let tiled = decide(home: nil, current: mac, connected: [mac, ext], untiled: [ext])
+        XCTAssertEqual(tiled.placement, .tile(display: mac))
+        XCTAssertEqual(tiled.home, mac)
+        let left = decide(home: nil, current: ext, connected: [mac, ext], untiled: [ext])
+        XCTAssertEqual(left.placement, .leave)
+        XCTAssertEqual(left.home, ext)
+    }
+
+    func testHomeIsStickyWhileItsDisplayIsConnected() {
+        // A dragged group can pass over another display without losing its tiles.
+        let result = decide(home: ext, current: mac, connected: [mac, ext])
+        XCTAssertEqual(result.placement, .tile(display: ext))
+        XCTAssertEqual(result.home, ext)
+    }
+
+    func testWindowOfAnUntiledDisplayStaysUntouchedWhenTheDisplayIsUnplugged() {
+        let unplugged = decide(home: ext, current: mac, connected: [mac], untiled: [ext])
+        XCTAssertEqual(unplugged.placement, .leave)
+        XCTAssertEqual(unplugged.home, ext, "it still belongs to the external display")
+        let back = decide(home: ext, current: ext, connected: [mac, ext], untiled: [ext])
+        XCTAssertEqual(back.placement, .leave)
+    }
+
+    func testTileOfAnUnpluggedDisplayIsTiledWhereItLandsAndGoesBack() {
+        let unplugged = decide(home: ext, current: mac, connected: [mac])
+        XCTAssertEqual(unplugged.placement, .tile(display: mac))
+        XCTAssertEqual(unplugged.home, ext, "the home survives the unplug")
+        // Plugged in again: macOS may still show it on the MacBook, but it goes back to its group.
+        let back = decide(home: ext, current: mac, connected: [mac, ext])
+        XCTAssertEqual(back.placement, .tile(display: ext))
+        // Landing on a display with tiling off leaves it alone until its own display returns.
+        XCTAssertEqual(decide(home: ext, current: mac, connected: [mac], untiled: [mac]).placement, .leave)
+    }
+
+    func testMovingAWindowFromAnUntiledDisplayOntoATiledOneJoinsTheGrid() {
+        let result = decide(home: ext, current: mac, connected: [mac, ext], untiled: [ext])
+        XCTAssertEqual(result.placement, .tile(display: mac))
+        XCTAssertEqual(result.home, mac)
+    }
+}
+
 final class ConfigTests: XCTestCase {
     func testRuleMatching() {
         let rule = Rule(app: "com.apple.Terminal")

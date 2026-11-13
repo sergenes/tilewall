@@ -17,6 +17,7 @@ tilewall: tiles windows in a grid and grows the focused one to a quarter of the 
   tilewall orientation [landscape|portrait]   tiles in rows, or in columns
   tilewall fill             make every group fill its screen again
   tilewall area <x> <y> <width> <height>   place the focused group, origin at the top left of the main display
+  tilewall display [<number> on|off]   list displays, or switch tiling on or off for one
   tilewall send [id]        move a tile to the group of the next display
   tilewall guide            open the help window with the hotkeys
   tilewall corners [square|round]   square window corners for apps started from now on
