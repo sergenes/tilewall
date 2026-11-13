@@ -1,6 +1,14 @@
 import CoreGraphics
 import Foundation
 
+/// Which way the tiles are laid out.
+public enum Orientation: String, Codable, Equatable {
+    /// Rows: the focused row grows taller, and only the tiles in that row change width.
+    case landscape
+    /// Columns: the focused column grows wider, and only the tiles in that column change height.
+    case portrait
+}
+
 public struct LayoutOptions: Equatable {
     /// Share of each screen axis the focused tile takes. 0.5 on both axes is a quarter of the screen.
     public var focusFraction: Double
@@ -8,11 +16,13 @@ public struct LayoutOptions: Equatable {
     public var gap: Double
     /// Preferred width / height of an unfocused tile, used to pick the grid shape.
     public var targetAspect: Double
+    public var orientation: Orientation
 
-    public init(focusFraction: Double = 0.5, gap: Double = 0, targetAspect: Double = 1.5) {
+    public init(focusFraction: Double = 0.5, gap: Double = 0, targetAspect: Double = 1.5, orientation: Orientation = .landscape) {
         self.focusFraction = focusFraction
         self.gap = gap
         self.targetAspect = targetAspect
+        self.orientation = orientation
     }
 }
 
@@ -79,20 +89,13 @@ public enum Layout {
         }
 
         let heights = split(length: inner.height, count: rows.count, focused: focusRow, fraction: options.focusFraction)
-        let focusWidths = focusRow.map {
-            split(length: inner.width, count: rows[$0], focused: focusCol, fraction: options.focusFraction)
-        }
 
         var result: [[CGRect]] = []
         var y = Double(inner.minY)
         for (r, n) in rows.enumerated() {
-            let widths: [Double]
-            if let focusWidths, focusWidths.count == n {
-                // Same number of tiles as the focused row: reuse its widths so columns line up.
-                widths = focusWidths
-            } else {
-                widths = split(length: inner.width, count: n, focused: nil, fraction: options.focusFraction)
-            }
+            // Only the focused row gives its focused tile extra width. Every other row stays an even split,
+            // so a focus change resizes those tiles on one axis only.
+            let widths = split(length: inner.width, count: n, focused: r == focusRow ? focusCol : nil, fraction: options.focusFraction)
             var row: [CGRect] = []
             var x = Double(inner.minX)
             for w in widths {
@@ -107,6 +110,28 @@ public enum Layout {
             y += heights[r]
         }
         return result
+    }
+
+    /// Lays out and places `count` tiles in `area`, honouring the orientation.
+    ///
+    /// Portrait is the landscape layout with the two axes swapped: tiles run down columns instead of along rows.
+    /// `place` receives the tile index and the wanted frame, applies it, and returns the size the window ended up with.
+    public static func arrange(count: Int, focused: Int?, area: CGRect, options: LayoutOptions, place: (Int, CGRect) -> CGSize) {
+        guard options.orientation == .portrait else {
+            return pack(rows: rows(count: count, focused: focused, area: area, options: options), gap: options.gap, place: place)
+        }
+        var swapped = options
+        swapped.orientation = .landscape
+        swapped.targetAspect = options.targetAspect > 0 ? 1 / options.targetAspect : options.targetAspect
+        let flipped = rows(count: count, focused: focused, area: transpose(area), options: swapped)
+        pack(rows: flipped, gap: options.gap) { index, wanted in
+            let actual = place(index, transpose(wanted))
+            return CGSize(width: actual.height, height: actual.width)
+        }
+    }
+
+    private static func transpose(_ r: CGRect) -> CGRect {
+        CGRect(x: r.minY, y: r.minX, width: r.height, height: r.width)
     }
 
     /// Places tiles one by one, feeding the size each window really took into the position of the next one.

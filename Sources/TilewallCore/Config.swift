@@ -32,6 +32,8 @@ public struct Config: Codable, Equatable {
 
     /// The backdrop behind each group: "auto" follows the system appearance, "#rrggbb" is a fixed color, "none" disables it.
     public var backdrop: String
+    /// "landscape" lays tiles out in rows, "portrait" in columns.
+    public var orientation: Orientation
 
     /// All defaults sit under the left hand, next to the left control and option keys.
     public static let defaultHotkeys: [String: String] = [
@@ -51,7 +53,8 @@ public struct Config: Codable, Equatable {
         gap: Double = 0,
         targetAspect: Double = 1.5,
         hotkeys: [String: String] = Config.defaultHotkeys,
-        backdrop: String = "auto"
+        backdrop: String = "auto",
+        orientation: Orientation = .landscape
     ) {
         self.rules = rules
         self.focusFraction = focusFraction
@@ -59,6 +62,7 @@ public struct Config: Codable, Equatable {
         self.targetAspect = targetAspect
         self.hotkeys = hotkeys
         self.backdrop = backdrop
+        self.orientation = orientation
     }
 
     public init(from decoder: Decoder) throws {
@@ -70,6 +74,7 @@ public struct Config: Codable, Equatable {
         targetAspect = try c.decodeIfPresent(Double.self, forKey: .targetAspect) ?? defaults.targetAspect
         hotkeys = defaults.hotkeys.merging(try c.decodeIfPresent([String: String].self, forKey: .hotkeys) ?? [:]) { _, new in new }
         backdrop = try c.decodeIfPresent(String.self, forKey: .backdrop) ?? defaults.backdrop
+        orientation = try c.decodeIfPresent(Orientation.self, forKey: .orientation) ?? defaults.orientation
         guard focusFraction > 0, focusFraction <= 1 else {
             throw DecodingError.dataCorruptedError(forKey: .focusFraction, in: c, debugDescription: "focusFraction must be in (0, 1]")
         }
@@ -79,33 +84,34 @@ public struct Config: Codable, Equatable {
     }
 
     public var layoutOptions: LayoutOptions {
-        LayoutOptions(focusFraction: focusFraction, gap: gap, targetAspect: targetAspect)
+        LayoutOptions(focusFraction: focusFraction, gap: gap, targetAspect: targetAspect, orientation: orientation)
     }
 }
 
 public enum Paths {
     public static var home: URL {
-        if let custom = ProcessInfo.processInfo.environment["MOSAIC_HOME"], !custom.isEmpty {
+        if let custom = ProcessInfo.processInfo.environment["TILEWALL_HOME"], !custom.isEmpty {
             return URL(fileURLWithPath: custom, isDirectory: true)
         }
-        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/mosaic", isDirectory: true)
+        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/tilewall", isDirectory: true)
     }
     public static var config: URL { home.appendingPathComponent("config.json") }
     public static var state: URL { home.appendingPathComponent("state.json") }
-    public static var socket: URL { home.appendingPathComponent("mosaic.sock") }
-    public static var log: URL { home.appendingPathComponent("mosaic.log") }
+    public static var socket: URL { home.appendingPathComponent("tilewall.sock") }
+    public static var log: URL { home.appendingPathComponent("tilewall.log") }
 }
 
 public enum ConfigStore {
     /// Loads the config, writing the defaults first when the file does not exist.
+    public static func save(_ config: Config, to url: URL = Paths.config) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        try encoder.encode(config).write(to: url, options: .atomic)
+    }
+
     public static func load(from url: URL = Paths.config) throws -> Config {
-        let fm = FileManager.default
-        if !fm.fileExists(atPath: url.path) {
-            try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-            try encoder.encode(Config()).write(to: url, options: .atomic)
-        }
+        if !FileManager.default.fileExists(atPath: url.path) { try save(Config(), to: url) }
         return try JSONDecoder().decode(Config.self, from: Data(contentsOf: url))
     }
 }

@@ -1,6 +1,6 @@
 #!/bin/zsh
-# Builds dist/mosaic.app. With signing settings present it also signs, notarizes and staples it,
-# and writes dist/mosaic-<version>.zip ready to publish.
+# Builds dist/tilewall.app. With signing settings present it also signs, notarizes and staples it,
+# and writes dist/tilewall-<version>.zip ready to publish.
 #
 # Signing settings come from private/release.env, which is not part of the repository:
 #   DEVELOPER_ID="Developer ID Application: Your Name (TEAMID)"
@@ -12,9 +12,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 VERSION="$(cat VERSION)"
-BUNDLE_ID="${BUNDLE_ID:-app.mosaic.tiler}"
-APP="dist/mosaic.app"
-ZIP="dist/mosaic-$VERSION.zip"
+BUNDLE_ID="${BUNDLE_ID:-app.tilewall.tiler}"
+APP="dist/tilewall.app"
+ZIP="dist/tilewall-$VERSION.zip"
 [[ -f private/release.env ]] && source private/release.env
 
 echo "==> Testing"
@@ -22,22 +22,22 @@ swift test 2>&1 | grep -E "Executed .* tests|error:" | tail -1
 
 echo "==> Building $VERSION (arm64 + x86_64)"
 swift build -c release --arch arm64 --arch x86_64 2>&1 | tail -1
-BINARY="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)/mosaic"
+BINARY="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)/tilewall"
 
 echo "==> Assembling $APP"
 rm -rf dist
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BINARY" "$APP/Contents/MacOS/mosaic"
+cp "$BINARY" "$APP/Contents/MacOS/tilewall"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key><string>mosaic</string>
-    <key>CFBundleDisplayName</key><string>mosaic</string>
+    <key>CFBundleName</key><string>tilewall</string>
+    <key>CFBundleDisplayName</key><string>tilewall</string>
     <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
-    <key>CFBundleExecutable</key><string>mosaic</string>
+    <key>CFBundleExecutable</key><string>tilewall</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>$VERSION</string>

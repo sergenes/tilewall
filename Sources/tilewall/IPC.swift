@@ -1,7 +1,7 @@
 import Foundation
-import MosaicCore
+import TilewallCore
 
-/// One request line in, one text reply out, over a Unix socket in the mosaic home directory.
+/// One request line in, one text reply out, over a Unix socket in the tilewall home directory.
 enum IPC {
     private static func address() -> sockaddr_un? {
         var addr = sockaddr_un()
@@ -46,10 +46,10 @@ enum IPC {
         unlink(Paths.socket.path)
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0, let bound = withAddress({ bind(fd, $0, $1) }) else {
-            throw NSError(domain: "mosaic", code: 1, userInfo: [NSLocalizedDescriptionKey: "socket path is too long: \(Paths.socket.path)"])
+            throw NSError(domain: "tilewall", code: 1, userInfo: [NSLocalizedDescriptionKey: "socket path is too long: \(Paths.socket.path)"])
         }
         guard bound == 0, listen(fd, 8) == 0 else {
-            throw NSError(domain: "mosaic", code: 2, userInfo: [NSLocalizedDescriptionKey: "cannot listen on \(Paths.socket.path): \(String(cString: strerror(errno)))"])
+            throw NSError(domain: "tilewall", code: 2, userInfo: [NSLocalizedDescriptionKey: "cannot listen on \(Paths.socket.path): \(String(cString: strerror(errno)))"])
         }
         chmod(Paths.socket.path, 0o600)
         signal(SIGPIPE, SIG_IGN)

@@ -1,6 +1,6 @@
 import ApplicationServices
 import Cocoa
-import MosaicCore
+import TilewallCore
 
 struct Window {
     let id: CGWindowID
@@ -43,7 +43,7 @@ final class WindowManager {
     /// The display whose group a window belongs to. Sticky, so a dragged group keeps its tiles.
     private var homes: [CGWindowID: CGDirectDisplayID] = [:]
     private var lastGroups: [Group] = []
-    /// Set while a mouse button is down and the focused tile no longer sits where mosaic put it.
+    /// Set while a mouse button is down and the focused tile no longer sits where tilewall put it.
     private var userChangedTile = false
     /// The group that held the focused window at the last retile, nil when focus was outside every group.
     private var focusedGroup: CGDirectDisplayID?
@@ -232,7 +232,7 @@ final class WindowManager {
         pending = nil
         guard !paused else { return backdrop.hide() }
         // Resizing a window under a pressed mouse button turns the click into a drag or a text selection.
-        // While the button is down mosaic only follows: a dragged tile takes the rest of its group along.
+        // While the button is down tilewall only follows: a dragged tile takes the rest of its group along.
         guard NSEvent.pressedMouseButtons == 0 else {
             followDrag()
             return scheduleRetile(after: 0.03)
@@ -251,8 +251,7 @@ final class WindowManager {
             alive.formUnion(ids)
             if let focus, ids.contains(focus) { lastFocus[group.screen] = focus }
             let focusIndex = lastFocus[group.screen].flatMap { ids.firstIndex(of: $0) }
-            let rows = Layout.rows(count: ids.count, focused: focusIndex, area: group.area, options: config.layoutOptions)
-            Layout.pack(rows: rows, gap: config.gap) { index, target in
+            Layout.arrange(count: ids.count, focused: focusIndex, area: group.area, options: config.layoutOptions) { index, target in
                 let window = group.windows[index]
                 // Apps such as Terminal snap to whole character cells, so compare against what the last apply produced.
                 if let last = applied[window.id], last.target == target, window.element.frame == last.result {
@@ -376,6 +375,15 @@ final class WindowManager {
         return value ? "paused" : "resumed"
     }
 
+    /// Switches between rows and columns, and stores the choice in the config file.
+    func setOrientation(_ orientation: Orientation) -> String {
+        config.orientation = orientation
+        do { try ConfigStore.save(config) } catch { return "error: cannot write the config: \(error.localizedDescription)" }
+        applied.removeAll()
+        retile()
+        return "orientation: \(orientation.rawValue)"
+    }
+
     func reload() -> String {
         do {
             config = try ConfigStore.load()
@@ -435,7 +443,7 @@ final class WindowManager {
     func managedWindows() -> [Window] { tiles().flatMap(\.windows) }
 
     /// Tiles every window the rules match again, undoing all manual excludes, and resumes tiling.
-    func mosaicAll() -> String {
+    func tileAll() -> String {
         excluded.removeAll()
         paused = false
         save()
@@ -445,7 +453,7 @@ final class WindowManager {
     }
 
     /// Releases every tile on the current space. The windows stay where they are and can be moved freely.
-    func unmosaicAll() -> String {
+    func untileAll() -> String {
         let tiles = managedWindows()
         for w in tiles {
             if matchesRule(w) { excluded.insert(w.id) } else { included.remove(w.id) }
@@ -497,7 +505,7 @@ final class WindowManager {
     func status(all: Bool) -> String {
         let focus = focusedWindow()?.id
         let rules = config.rules.map { rule in rule.title.map { "\(rule.app) /\($0)/" } ?? rule.app }
-        var lines = ["mosaic \(paused ? "paused" : "running"), rules: \(rules.joined(separator: ", "))"]
+        var lines = ["tilewall \(paused ? "paused" : "running"), rules: \(rules.joined(separator: ", "))"]
         let groups = tiles()
         for group in groups {
             lines.append("display \(group.screen), group at \(describe(group.area))\(areas[group.screen] == nil ? " (fills the screen)" : ""): \(group.windows.count) tiles")

@@ -1,9 +1,9 @@
 import Cocoa
-import MosaicCore
+import TilewallCore
 
 /// The actions a hotkey can trigger, in the order they are shown.
 let hotkeyActions: [(name: String, title: String, detail: String)] = [
-    ("toggle", "Include or Exclude Focused Window", "Adds the focused window to the mosaic, or takes it out."),
+    ("toggle", "Include or Exclude Focused Window", "Adds the focused window to the tilewall, or takes it out."),
     ("next", "Focus Next Tile", "Moves focus to the next tile, which then grows."),
     ("prev", "Focus Previous Tile", "Moves focus to the previous tile."),
     ("fill", "Fill Screen", "Puts every group back to filling its whole screen."),
@@ -29,7 +29,7 @@ final class HelpWindow {
     private func makeWindow() -> NSWindow {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 640),
                               styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
-        window.title = "mosaic Help"
+        window.title = "tilewall Help"
         window.isReleasedWhenClosed = false
         let scroll = NSTextView.scrollableTextView()
         scroll.frame = window.contentView!.bounds
@@ -59,8 +59,8 @@ final class HelpWindow {
             add(string + "\n", font: .systemFont(ofSize: 15, weight: .semibold), style: style)
         }
 
-        heading("What mosaic does")
-        add("mosaic arranges windows as tiles in a grid, so you can watch all of them at once. ")
+        heading("What tilewall does")
+        add("tilewall arranges windows as tiles in a grid, so you can watch all of them at once. ")
         add("The focused tile grows to a quarter of the group. The other tiles keep their place and shrink.\n")
         add("Click a tile, or use the hotkeys below, to choose which one is large.\n")
 
@@ -68,7 +68,7 @@ final class HelpWindow {
         let rules = config.rules.map { rule in rule.title.map { "\(rule.app) with a title matching \($0)" } ?? rule.app }
         add("Windows of these apps are tiled automatically: \(rules.isEmpty ? "none" : rules.joined(separator: ", ")).\n")
         add("Any other window can be added by hand, and any tile can be taken out, with Include or Exclude Focused Window.\n")
-        add("Mosaic All tiles every matching window again. Unmosaic All releases every tile so the windows can be moved freely.\n")
+        add("Tile All tiles every matching window again. Untile All releases every tile so the windows can be moved freely.\n")
         add("Tabs are not windows. Use Split Tabs Into Windows to turn each tab into a tile.\n")
 
         heading("The group works like one window")
@@ -94,11 +94,11 @@ final class HelpWindow {
         add("Hotkeys, rules, gap and backdrop color are set in\n")
         add(Paths.config.path + "\n", font: .monospacedSystemFont(ofSize: 12, weight: .regular))
         add("Choose Reload Config after editing it. Run ")
-        add("mosaic help", font: .monospacedSystemFont(ofSize: 12, weight: .regular))
+        add("tilewall help", font: .monospacedSystemFont(ofSize: 12, weight: .regular))
         add(" in a terminal for the command line.\n")
 
         heading("About")
-        add("mosaic \(App.version) is free and open source: \(App.sourceURL)\n")
+        add("tilewall \(App.version) is free and open source: \(App.sourceURL)\n")
         if !App.supportURL.isEmpty { add("If it is useful to you, you can support it: \(App.supportURL)\n") }
         return out
     }

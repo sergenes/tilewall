@@ -1,9 +1,9 @@
 import Foundation
 import ServiceManagement
 
-/// Facts about how this copy of mosaic was built and started.
+/// Facts about how this copy of tilewall was built and started.
 enum App {
-    /// True when running from inside mosaic.app, false for a bare command line binary.
+    /// True when running from inside tilewall.app, false for a bare command line binary.
     static var isBundled: Bool { Bundle.main.bundleURL.pathExtension == "app" }
 
     static var version: String {
@@ -12,7 +12,7 @@ enum App {
 
     /// Where people can support the project. The menu item is hidden while this is empty.
     static let supportURL = ""
-    static let sourceURL = "https://github.com/sergenes/mosaic"
+    static let sourceURL = "https://github.com/sergenes/tilewall"
 
     /// Start at login. Only an app bundle can register itself as a login item.
     static var launchesAtLogin: Bool {

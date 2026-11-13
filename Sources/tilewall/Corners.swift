@@ -1,6 +1,6 @@
 import ApplicationServices
 import Cocoa
-import MosaicCore
+import TilewallCore
 
 /// Square window corners through an undocumented AppKit default (macOS 26.4 and later).
 ///
@@ -46,7 +46,7 @@ enum TerminalSessions {
     /// Opens a new Terminal window attached to the session. Works whether or not Terminal is running.
     static func open(_ session: String) throws {
         guard session.range(of: #"^[A-Za-z0-9._-]+$"#, options: .regularExpression) != nil else {
-            throw NSError(domain: "mosaic", code: 3, userInfo: [NSLocalizedDescriptionKey: "unsupported session name \"\(session)\""])
+            throw NSError(domain: "tilewall", code: 3, userInfo: [NSLocalizedDescriptionKey: "unsupported session name \"\(session)\""])
         }
         let directory = Paths.home.appendingPathComponent("attach", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -59,7 +59,7 @@ enum TerminalSessions {
         try opener.run()
         opener.waitUntilExit()
         guard opener.terminationStatus == 0 else {
-            throw NSError(domain: "mosaic", code: 4, userInfo: [NSLocalizedDescriptionKey: "could not open Terminal for \(session)"])
+            throw NSError(domain: "tilewall", code: 4, userInfo: [NSLocalizedDescriptionKey: "could not open Terminal for \(session)"])
         }
     }
 }

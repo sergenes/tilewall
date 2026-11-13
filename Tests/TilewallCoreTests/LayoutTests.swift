@@ -1,5 +1,5 @@
 import XCTest
-@testable import MosaicCore
+@testable import TilewallCore
 
 final class LayoutTests: XCTestCase {
     let screen = CGRect(x: -1876, y: 37, width: 1876, height: 1080)
@@ -51,15 +51,53 @@ final class LayoutTests: XCTestCase {
         }
     }
 
-    func testFocusChangeKeepsEveryWindowInItsSlot() {
-        let a = Layout.frames(count: 12, focused: 0, area: screen, options: noGap)
-        let b = Layout.frames(count: 12, focused: 7, area: screen, options: noGap)
-        // Relative order on both axes is unchanged: nothing jumps to another slot.
-        for i in 0..<12 {
-            for j in 0..<12 where i != j {
-                if a[i].maxX <= a[j].minX { XCTAssertLessThanOrEqual(b[i].maxX, b[j].minX) }
-                if a[i].maxY <= a[j].minY { XCTAssertLessThanOrEqual(b[i].maxY, b[j].minY) }
+    func testFocusChangeKeepsEveryWindowInItsRowAndOrder() {
+        let a = Layout.rows(count: 12, focused: 0, area: screen, options: noGap)
+        let b = Layout.rows(count: 12, focused: 7, area: screen, options: noGap)
+        XCTAssertEqual(a.map(\.count), b.map(\.count))
+        for rows in [a, b] {
+            for (r, row) in rows.enumerated() {
+                for c in 1..<row.count { XCTAssertEqual(row[c].minX, row[c - 1].maxX) }
+                if r > 0 { XCTAssertEqual(row[0].minY, rows[r - 1][0].maxY) }
             }
+        }
+    }
+
+    func testOnlyTheFocusedRowChangesWidth() {
+        let even = Layout.rows(count: 12, focused: nil, area: screen, options: noGap)
+        let focused = Layout.rows(count: 12, focused: 5, area: screen, options: noGap)   // row 1, column 1
+        for r in [0, 2] {
+            XCTAssertEqual(focused[r].map(\.width), even[r].map(\.width), "row \(r) keeps its widths")
+            XCTAssertEqual(focused[r].map(\.minX), even[r].map(\.minX))
+            XCTAssertLessThan(focused[r][0].height, even[r][0].height, "row \(r) only gets shorter")
+        }
+        XCTAssertEqual(focused[1][1].width, screen.width / 2, accuracy: 1)
+        XCTAssertEqual(focused[1][1].height, screen.height / 2, accuracy: 1)
+    }
+
+    func testPortraitIsTheLandscapeLayoutWithSwappedAxes() {
+        let area = CGRect(x: 100, y: 50, width: 1600, height: 1000)
+        var placed: [CGRect] = Array(repeating: .zero, count: 12)
+        let portrait = LayoutOptions(focusFraction: 0.5, gap: 0, targetAspect: 1.5, orientation: .portrait)
+        Layout.arrange(count: 12, focused: 5, area: area, options: portrait) { index, wanted in
+            placed[index] = wanted
+            return wanted.size
+        }
+        let total = placed.reduce(0.0) { $0 + Double($1.width * $1.height) }
+        XCTAssertEqual(total, Double(area.width * area.height), accuracy: 1)
+        for (i, a) in placed.enumerated() {
+            XCTAssertTrue(area.contains(a))
+            for b in placed[(i + 1)...] { XCTAssertTrue(a.intersection(b).isEmpty || a.intersection(b).width * a.intersection(b).height == 0) }
+        }
+        XCTAssertEqual(placed[5].width, area.width / 2, accuracy: 1)
+        XCTAssertEqual(placed[5].height, area.height / 2, accuracy: 1)
+        // Tiles run down columns: the first two share a column, and only the focused column has uneven heights.
+        XCTAssertEqual(placed[0].minX, placed[1].minX)
+        XCTAssertEqual(placed[1].minY, placed[0].maxY)
+        let columns = Dictionary(grouping: placed, by: \.minX)
+        for (x, tiles) in columns where x != placed[5].minX {
+            // Even up to the one point that rounding to whole points can cost.
+            XCTAssertLessThanOrEqual(tiles.map(\.height).max()! - tiles.map(\.height).min()!, 1, "column at \(x) keeps even heights")
         }
     }
 
@@ -162,7 +200,7 @@ final class ConfigTests: XCTestCase {
         XCTAssertTrue(Rule(app: "terminal").matches(bundleID: "com.apple.Terminal", appName: "Terminal", title: "x"))
         XCTAssertFalse(rule.matches(bundleID: "com.apple.Safari", appName: "Safari", title: "x"))
         let titled = Rule(app: "Terminal", title: "^aaw-")
-        XCTAssertTrue(titled.matches(bundleID: nil, appName: "Terminal", title: "aaw-mosaic"))
+        XCTAssertTrue(titled.matches(bundleID: nil, appName: "Terminal", title: "aaw-tilewall"))
         XCTAssertFalse(titled.matches(bundleID: nil, appName: "Terminal", title: "zsh"))
     }
 
@@ -175,6 +213,8 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(config.hotkeys["toggle"], "")
         XCTAssertEqual(config.hotkeys["next"], "ctrl+alt+d")
         XCTAssertEqual(config.backdrop, "auto")
+        XCTAssertEqual(config.orientation, .landscape)
+        XCTAssertEqual(try JSONDecoder().decode(Config.self, from: Data(#"{"orientation": "portrait"}"#.utf8)).orientation, .portrait)
     }
 
     func testDefaultHotkeysAreReachableWithTheLeftHand() {

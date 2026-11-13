@@ -11,5 +11,5 @@ test:
 install: build
 	mkdir -p $(PREFIX)/bin
 	# Copy then rename, so a running daemon keeps its old binary intact until it is restarted.
-	cp .build/release/mosaic $(PREFIX)/bin/mosaic.new
-	mv -f $(PREFIX)/bin/mosaic.new $(PREFIX)/bin/mosaic
+	cp .build/release/tilewall $(PREFIX)/bin/tilewall.new
+	mv -f $(PREFIX)/bin/tilewall.new $(PREFIX)/bin/tilewall

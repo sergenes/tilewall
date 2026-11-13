@@ -1,6 +1,6 @@
 import ApplicationServices
 import Cocoa
-import MosaicCore
+import TilewallCore
 
 final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var manager: WindowManager!
@@ -11,7 +11,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     static func run() -> Never {
         if IPC.send("ping") != nil {
-            print("mosaic is already running")
+            print("tilewall is already running")
             exit(0)
         }
         let app = NSApplication.shared
@@ -38,7 +38,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             exit(1)
         }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "rectangle.3.group", accessibilityDescription: "mosaic")
+        statusItem.button?.image = NSImage(systemSymbolName: "rectangle.3.group", accessibilityDescription: "tilewall")
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu
@@ -49,7 +49,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func waitForAccessibility() {
         let prompt = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         if AXIsProcessTrustedWithOptions(prompt) {
-            log("mosaic \(App.version) started, config \(Paths.config.path)")
+            log("tilewall \(App.version) started, config \(Paths.config.path)")
             manager.start()
         } else {
             log("waiting for Accessibility permission: System Settings > Privacy & Security > Accessibility")
@@ -101,16 +101,21 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             switch parts.dropFirst().first {
             case "next": reply(manager.cycle(1))
             case "prev": reply(manager.cycle(-1))
-            default: reply(id.map { manager.focus(id: $0) } ?? "error: usage: mosaic focus next|prev|<window id>")
+            default: reply(id.map { manager.focus(id: $0) } ?? "error: usage: tilewall focus next|prev|<window id>")
             }
         case "retile": manager.retile(); reply("retiled")
-        case "all": reply(manager.mosaicAll())
-        case "none": reply(manager.unmosaicAll())
+        case "orientation":
+            guard parts.count == 2, let orientation = Orientation(rawValue: parts[1]) else {
+                return reply(parts.count == 1 ? "orientation: \(manager.config.orientation.rawValue)" : "error: usage: tilewall orientation [landscape|portrait]")
+            }
+            reply(manager.setOrientation(orientation))
+        case "all": reply(manager.tileAll())
+        case "none": reply(manager.untileAll())
         case "fill": reply(manager.fillScreens())
         case "send": reply(manager.send(id: id))
         case "area":
             let numbers = parts.dropFirst().compactMap(Double.init)
-            guard numbers.count == 4, parts.count == 5 else { reply("error: usage: mosaic area <x> <y> <width> <height>"); break }
+            guard numbers.count == 4, parts.count == 5 else { reply("error: usage: tilewall area <x> <y> <width> <height>"); break }
             reply(manager.setArea(CGRect(x: numbers[0], y: numbers[1], width: numbers[2], height: numbers[3])))
         case "pause": reply(manager.setPaused(true))
         case "resume": reply(manager.setPaused(false))
@@ -125,11 +130,11 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             case "square": Corners.setSquare(true)
             case "round": Corners.setSquare(false)
             case nil: break
-            default: return reply("error: usage: mosaic corners [square|round]")
+            default: return reply("error: usage: tilewall corners [square|round]")
             }
             reply("corners: \(Corners.isSquare ? "square" : "round") for apps started from now on, restart an app to apply")
         case "attach":
-            guard parts.count == 2 else { return reply("error: usage: mosaic attach <tmux session>") }
+            guard parts.count == 2 else { return reply("error: usage: tilewall attach <tmux session>") }
             do { try TerminalSessions.open(parts[1]); reply("opened \(parts[1])") } catch { reply("error: \(error.localizedDescription)") }
         case "sessions": reply(TerminalSessions.attached().joined(separator: "\n"))
         case "quit", "stop":
@@ -138,7 +143,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 unlink(Paths.socket.path)
                 exit(0)
             }
-        default: reply("error: unknown command \"\(command)\", try: mosaic help")
+        default: reply("error: unknown command \"\(command)\", try: tilewall help")
         }
     }
 
@@ -166,12 +171,12 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         func title(_ name: String) -> String { hotkeyActions.first { $0.name == name }!.title }
 
-        let version = NSMenuItem(title: "mosaic \(App.version)", action: nil, keyEquivalent: "")
+        let version = NSMenuItem(title: "tilewall \(App.version)", action: nil, keyEquivalent: "")
         version.isEnabled = false
         menu.addItem(version)
         menu.addItem(.separator())
-        add("Mosaic All", #selector(mosaicAll))
-        add("Unmosaic All", #selector(unmosaicAll))
+        add("Tile All", #selector(tileAll))
+        add("Untile All", #selector(untileAll))
         add(title("toggle"), #selector(menuAction(_:)), hotkey: "toggle").representedObject = "toggle"
         add(title("next"), #selector(menuAction(_:)), hotkey: "next").representedObject = "next"
         add(title("prev"), #selector(menuAction(_:)), hotkey: "prev").representedObject = "prev"
@@ -182,6 +187,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         add(title("fill"), #selector(menuAction(_:)), hotkey: "fill").representedObject = "fill"
         add(title("retile"), #selector(menuAction(_:)), hotkey: "retile").representedObject = "retile"
         add(manager.paused ? "Resume Tiling" : "Pause Tiling", #selector(menuAction(_:)), hotkey: "pause").representedObject = "pause"
+        add("Portrait Layout", #selector(toggleOrientation)).state = manager.config.orientation == .portrait ? .on : .off
         add("Split Tabs Into Windows", #selector(untabNow))
         add("Square Window Corners", #selector(toggleCorners)).state = Corners.isSquare ? .on : .off
         menu.addItem(.separator())
@@ -200,11 +206,11 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             item.toolTip = "\(w.app): \(w.title)"
         }
         menu.addItem(.separator())
-        add("mosaic Help", #selector(menuAction(_:)), hotkey: "help").representedObject = "help"
-        if !App.supportURL.isEmpty { add("Support mosaic…", #selector(openSupport)) }
+        add("tilewall Help", #selector(menuAction(_:)), hotkey: "help").representedObject = "help"
+        if !App.supportURL.isEmpty { add("Support tilewall…", #selector(openSupport)) }
         add("Reload Config", #selector(reloadConfig))
         if App.isBundled { add("Launch at Login", #selector(toggleLogin)).state = App.launchesAtLogin ? .on : .off }
-        add("Quit mosaic", #selector(quit))
+        add("Quit tilewall", #selector(quit))
     }
 
     /// Menu titles are cut in the middle, because window titles tend to differ at the start and at the end.
@@ -237,15 +243,18 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         macOS applies this when an app starts, and to every app, not only to tiles. \
         Apps that are already open keep their corners until you quit and reopen them.
 
-        mosaic does not restart apps for you. Before quitting Terminal, make sure nothing you need is running in it.
+        tilewall does not restart apps for you. Before quitting Terminal, make sure nothing you need is running in it.
         """
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
     }
     @objc private func openSupport() { URL(string: App.supportURL).map { _ = NSWorkspace.shared.open($0) } }
     @objc private func toggleLogin() { App.launchesAtLogin.toggle() }
-    @objc private func mosaicAll() { log(manager.mosaicAll()) }
-    @objc private func unmosaicAll() { log(manager.unmosaicAll()) }
+    @objc private func toggleOrientation() {
+        log(manager.setOrientation(manager.config.orientation == .portrait ? .landscape : .portrait))
+    }
+    @objc private func tileAll() { log(manager.tileAll()) }
+    @objc private func untileAll() { log(manager.untileAll()) }
     @objc private func untabNow() { manager.untab { log($0) } }
     @objc private func reloadConfig() { log(manager.reload()); registerHotkeys() }
     @objc private func focusTile(_ sender: NSMenuItem) {

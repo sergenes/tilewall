@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "mosaic",
+    name: "tilewall",
     platforms: [.macOS(.v13)],
     targets: [
-        .target(name: "MosaicCore"),
-        .executableTarget(name: "mosaic", dependencies: ["MosaicCore"]),
-        .testTarget(name: "MosaicCoreTests", dependencies: ["MosaicCore"]),
+        .target(name: "TilewallCore"),
+        .executableTarget(name: "tilewall", dependencies: ["TilewallCore"]),
+        .testTarget(name: "TilewallCoreTests", dependencies: ["TilewallCore"]),
     ]
 )

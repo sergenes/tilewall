@@ -1,5 +1,5 @@
 import Carbon.HIToolbox
-import MosaicCore
+import TilewallCore
 
 /// Global hotkeys through Carbon, which needs no extra permission.
 final class Hotkeys {
