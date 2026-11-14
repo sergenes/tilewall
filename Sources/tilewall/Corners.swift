@@ -27,7 +27,7 @@ enum Corners {
 enum TerminalSessions {
     static let bundleID = "com.apple.Terminal"
 
-    /// The tmux session a Terminal window title refers to, for example "aaw-kids" in "tmux attach -t =aaw-kids".
+    /// The tmux session a Terminal window title refers to, for example "aaw-api" in "tmux attach -t =aaw-api".
     static func session(inTitle title: String) -> String? {
         guard let range = title.range(of: #"tmux attach(-session)? -t =?[A-Za-z0-9._-]+"#, options: .regularExpression) else { return nil }
         return String(title[range]).components(separatedBy: " ").last?.trimmingCharacters(in: CharacterSet(charactersIn: "="))
