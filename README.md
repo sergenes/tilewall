@@ -59,8 +59,8 @@ Drag one tile by its title bar and the whole group moves.
 
 ### The app
 
-Download `tilewall-<version>.zip` from the [releases page](https://github.com/sergenes/tilewall/releases), unzip it, and move `tilewall.app` to Applications.
-The app is signed and notarized.
+Download `tilewall-<version>.dmg` from the [releases page](https://github.com/sergenes/tilewall/releases), open it, and drag `tilewall.app` to Applications.
+The app and the disk image are signed and notarized.
 It lives in the menu bar and has no Dock icon.
 
 On first start macOS asks for the Accessibility permission, under System Settings, Privacy & Security, Accessibility.
@@ -79,7 +79,7 @@ ln -s /Applications/tilewall.app/Contents/MacOS/tilewall ~/.local/bin/tilewall
 ```sh
 make install          # builds a release binary and copies it to ~/.local/bin/tilewall
 make test
-./scripts/release.sh  # builds dist/tilewall.app, unsigned unless private/release.env holds signing settings
+./scripts/release.sh  # builds dist/tilewall.app, and a signed disk image when private/release.env holds signing settings
 ```
 
 A binary started from a terminal uses that terminal's Accessibility permission.

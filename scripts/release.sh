@@ -1,6 +1,6 @@
 #!/bin/zsh
 # Builds dist/tilewall.app. With signing settings present it also signs, notarizes and staples it,
-# and writes dist/tilewall-<version>.zip ready to publish.
+# and writes dist/tilewall-<version>.dmg ready to publish.
 #
 # Signing settings come from private/release.env, which is not part of the repository:
 #   DEVELOPER_ID="Developer ID Application: Your Name (TEAMID)"
@@ -16,6 +16,7 @@ grep -q "badge/version-$VERSION-" README.md || { echo "README.md version badge d
 BUNDLE_ID="${BUNDLE_ID:-app.tilewall.tiler}"
 APP="dist/tilewall.app"
 ZIP="dist/tilewall-$VERSION.zip"
+DMG="dist/tilewall-$VERSION.dmg"
 [[ -f private/release.env ]] && source private/release.env
 
 echo "==> Testing"
@@ -61,14 +62,30 @@ echo "==> Signing as $DEVELOPER_ID"
 codesign --force --timestamp --options runtime --sign "$DEVELOPER_ID" "$APP"
 codesign --verify --strict --verbose=2 "$APP"
 
-echo "==> Notarizing (this takes a few minutes)"
-ditto -c -k --keepParent "$APP" "$ZIP"
-xcrun notarytool submit "$ZIP" --apple-id "$APPLE_ID" --password "$APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
-xcrun stapler staple "$APP"
+notarize() {
+    xcrun notarytool submit "$1" --apple-id "$APPLE_ID" --password "$APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+}
 
-# The zip that was notarized does not contain the stapled ticket, so zip again.
-rm "$ZIP"
+# The app gets its own ticket first, so it still verifies offline after it is dragged out of the disk image.
+echo "==> Notarizing the app (this takes a few minutes)"
 ditto -c -k --keepParent "$APP" "$ZIP"
+notarize "$ZIP"
+rm "$ZIP"
+xcrun stapler staple "$APP"
 spctl --assess --type execute --verbose=2 "$APP"
-echo "==> Done: $ZIP"
-shasum -a 256 "$ZIP"
+
+echo "==> Building $DMG"
+STAGE="dist/dmg"
+mkdir -p "$STAGE"
+ditto "$APP" "$STAGE/tilewall.app"
+ln -s /Applications "$STAGE/Applications"
+hdiutil create -quiet -volname "tilewall $VERSION" -srcfolder "$STAGE" -fs HFS+ -format UDZO "$DMG"
+rm -rf "$STAGE"
+codesign --force --timestamp --sign "$DEVELOPER_ID" "$DMG"
+
+echo "==> Notarizing the disk image"
+notarize "$DMG"
+xcrun stapler staple "$DMG"
+spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG"
+echo "==> Done: $DMG"
+shasum -a 256 "$DMG"
