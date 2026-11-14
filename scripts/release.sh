@@ -12,6 +12,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 VERSION="$(cat VERSION)"
+grep -q "badge/version-$VERSION-" README.md || { echo "README.md version badge does not say $VERSION"; exit 1; }
 BUNDLE_ID="${BUNDLE_ID:-app.tilewall.tiler}"
 APP="dist/tilewall.app"
 ZIP="dist/tilewall-$VERSION.zip"

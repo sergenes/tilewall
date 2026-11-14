@@ -1,25 +1,59 @@
-# tilewall
+<p align="center">
+  <img src="docs/icon.png" width="128" height="128" alt="tilewall app icon">
+</p>
+<h1 align="center">tilewall</h1>
+<p align="center">See all your agents at once.</p>
+<p align="center">
+  <img src="https://img.shields.io/badge/version-0.1.0-4f8ff7" alt="version 0.1.0">
+  <img src="https://img.shields.io/badge/macOS-13%2B-5cc78f" alt="macOS 13 or later">
+  <img src="https://img.shields.io/badge/Apple%20silicon%20%2B%20Intel-universal-9e80f0" alt="universal binary">
+  <img src="https://img.shields.io/badge/license-MIT-fbcc47" alt="MIT license">
+</p>
 
-See all your agents at once.
+![Twelve terminal windows tiled on one screen while focus moves from tile to tile](docs/focus.gif)
 
-![Twelve terminal windows tiled on one screen while focus moves from tile to tile](docs/demo.gif)
+<img src="docs/mascot.svg" align="right" width="190" alt="Tilly, the tilewall mascot: a yellow tile with a face, stacking smaller colored tiles">
 
 tilewall is a small macOS tiler for people who run many terminal agents side by side.
 Every tiled window gets a slot in a grid, and the focused one grows to a quarter of the screen.
 The other windows stay in their slots and shrink, so nothing jumps around when focus moves.
-
-In the default landscape layout the tiles run in rows.
-The focused row grows taller, and only the tiles in that row change width, so the other rows keep their widths and just get shorter.
-The portrait layout keeps every window in the same slot and flips the rule: the focused column grows wider, and only the tiles in that column change height.
-The other columns keep their heights and just get narrower.
-
-![Twelve terminal windows tiled, with the focused one taking a quarter of the screen](docs/screenshot.png)
 
 It arranges the windows you already have.
 Your agents keep running in Terminal, tmux, or any other app, and tilewall only moves and resizes their windows.
 
 tilewall is free and open source under the MIT license.
 It pairs well with [Agents At Work](https://agentsatwork.app), which runs agents in tmux sessions and lets you control them from a phone.
+
+The yellow tile with the face is Tilly, the mascot.
+Tilly is the focused tile: the big one, with the small ones stacked next to it.
+
+## How it works
+
+The recordings below show twelve demo sessions on a MacBook screen.
+
+### The focused tile grows
+
+Click a tile, or press ctrl+alt+d and ctrl+alt+a to walk through them.
+In the default landscape layout the tiles run in rows.
+The focused row grows taller, and only the tiles in that row change width, so the other rows keep their widths and just get shorter.
+
+![Twelve terminal windows tiled, with the focused one taking a quarter of the screen](docs/screenshot.png)
+
+### Portrait layout
+
+The portrait layout keeps every window in the same slot and flips the rule: the focused column grows wider, and only the tiles in that column change height.
+The other columns keep their heights and just get narrower.
+Switch with Portrait Layout in the menu or `tilewall orientation portrait`.
+
+![The same tiles switching to the portrait layout and back](docs/portrait.gif)
+
+### The group behaves like one window
+
+Resize one tile by its corner and the whole group scales with it.
+Drag one tile by its title bar and the whole group moves.
+`tilewall fill`, or ctrl+alt+f, makes the group fill the screen again.
+
+![A group of tiles being resized, dragged and then filling the screen again](docs/group.gif)
 
 ## Install
 
@@ -80,7 +114,7 @@ tilewall display 2 off    # leave the windows on display 2 alone; `on` tiles the
 tilewall pause            # also: resume, retile, reload, stop
 ```
 
-## The group behaves like one window
+## More about groups
 
 The tiles of a display form a group.
 Drag any tile by its title bar and the whole group moves with it.

@@ -51,6 +51,7 @@ final class WindowManager {
     private var lastGroups: [Group] = []
     /// Set while a mouse button is down and the focused tile no longer sits where tilewall put it.
     private var userChangedTile = false
+    private var dragLocation: CGPoint?
     /// The group that held the focused window at the last retile, nil when focus was outside every group.
     private var focusedGroup: String?
     private let backdrop = Backdrop()
@@ -301,6 +302,8 @@ final class WindowManager {
 
     /// Called repeatedly while a mouse button is down. Moves the whole group along with a dragged tile.
     private func followDrag() {
+        // Where the pointer is while the button is still down. After the release it may already be somewhere else.
+        dragLocation = NSEvent.mouseLocation
         guard let dragged = focusedWindow(), let last = applied[dragged.id], let now = dragged.element.frame,
               now != last.result, let group = lastGroups.first(where: { g in g.windows.contains { $0.id == dragged.id } }) else { return }
         userChangedTile = true
@@ -327,7 +330,8 @@ final class WindowManager {
     private func adoptDropOnOtherDisplay(focus: CGWindowID?, in groups: [Group]) -> Bool {
         guard let focus, let group = groups.first(where: { g in g.windows.contains { $0.id == focus } }),
               let primary = NSScreen.screens.first else { return false }
-        let mouse = NSEvent.mouseLocation
+        let mouse = dragLocation ?? NSEvent.mouseLocation
+        dragLocation = nil
         let drop = CGPoint(x: mouse.x, y: primary.frame.maxY - mouse.y)
         let screens = screenAreas()
         guard let target = screens.first(where: { $0.area.contains(drop) })

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 300" width="360" height="300" role="img" aria-labelledby="t">
+  <title id="t">Tilly, the tilewall mascot: a yellow tile with a face, stacking smaller colored tiles</title>
+  <!-- shadow -->
+  <ellipse cx="180" cy="278" rx="120" ry="10" fill="#000" opacity="0.12"/>
+  <!-- small tiles stacked on the right, the way unfocused tiles sit beside the focused one -->
+  <g stroke="#11141c" stroke-width="5" stroke-linejoin="round">
+    <rect x="232" y="206" width="62" height="62" rx="9" fill="#4f8ff7"/>
+    <rect x="238" y="146" width="56" height="56" rx="9" fill="#5cc78f" transform="rotate(4 266 174)"/>
+    <rect x="226" y="88" width="56" height="56" rx="9" fill="#9e80f0" transform="rotate(-7 254 116)"/>
+  </g>
+  <!-- a tile held up in the left hand -->
+  <g stroke="#11141c" stroke-width="5" stroke-linejoin="round" stroke-linecap="round" fill="none">
+    <path d="M78 150 Q52 128 54 96"/>
+    <rect x="28" y="42" width="54" height="54" rx="9" fill="#ed6b61" transform="rotate(-10 55 69)"/>
+  </g>
+  <!-- right arm steadying the stack -->
+  <path d="M206 168 Q224 160 236 150" stroke="#11141c" stroke-width="5" stroke-linecap="round" fill="none"/>
+  <!-- legs -->
+  <g stroke="#11141c" stroke-width="5" stroke-linecap="round" fill="none">
+    <path d="M116 244 V266 H102"/>
+    <path d="M168 244 V266 H182"/>
+  </g>
+  <!-- body: the focused tile -->
+  <rect x="74" y="104" width="136" height="142" rx="18" fill="#fbcc47" stroke="#11141c" stroke-width="5"/>
+  <!-- title bar with the three window buttons -->
+  <path d="M76.500 134 H207.500" stroke="#11141c" stroke-width="4"/>
+  <circle cx="94" cy="120" r="5" fill="#ed6b61" stroke="#11141c" stroke-width="2.500"/>
+  <circle cx="110" cy="120" r="5" fill="#fff3c4" stroke="#11141c" stroke-width="2.500"/>
+  <circle cx="126" cy="120" r="5" fill="#5cc78f" stroke="#11141c" stroke-width="2.500"/>
+  <!-- face -->
+  <ellipse cx="118" cy="178" rx="9" ry="12" fill="#11141c"/>
+  <ellipse cx="166" cy="178" rx="9" ry="12" fill="#11141c"/>
+  <circle cx="121" cy="173" r="3.500" fill="#fff"/>
+  <circle cx="169" cy="173" r="3.500" fill="#fff"/>
+  <path d="M126 204 Q142 220 158 204" stroke="#11141c" stroke-width="5" stroke-linecap="round" fill="none"/>
+  <ellipse cx="100" cy="200" rx="8" ry="5" fill="#ed6b61" opacity="0.45"/>
+  <ellipse cx="184" cy="200" rx="8" ry="5" fill="#ed6b61" opacity="0.45"/>
+</svg>
