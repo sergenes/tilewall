@@ -52,7 +52,13 @@ case "start":
         let launcher = Process()
         launcher.executableURL = URL(fileURLWithPath: "/bin/sh")
         try? FileManager.default.createDirectory(at: Paths.home, withIntermediateDirectories: true)
-        launcher.arguments = ["-c", "nohup \"$0\" run >> \"$1\" 2>&1 &", Bundle.main.executablePath ?? CommandLine.arguments[0], Paths.log.path]
+        if let app = App.bundleURL {
+            // Part of an app bundle: start it the way Finder would, so macOS treats it as the app.
+            launcher.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            launcher.arguments = [app.path]
+        } else {
+            launcher.arguments = ["-c", "nohup \"$0\" run >> \"$1\" 2>&1 &", Bundle.main.executablePath ?? CommandLine.arguments[0], Paths.log.path]
+        }
         try launcher.run()
         launcher.waitUntilExit()
     } catch {

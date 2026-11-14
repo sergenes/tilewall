@@ -6,8 +6,16 @@ enum App {
     /// True when running from inside tilewall.app, false for a bare command line binary.
     static var isBundled: Bool { Bundle.main.bundleURL.pathExtension == "app" }
 
+    /// The app bundle this binary lives in, also when it was started through a symlink such as ~/.local/bin/tilewall.
+    static let bundleURL: URL? = {
+        guard let executable = Bundle.main.executableURL?.resolvingSymlinksInPath() else { return nil }
+        let app = executable.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        return app.pathExtension == "app" ? app : nil
+    }()
+
     static var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+        let bundle = bundleURL.flatMap(Bundle.init(url:)) ?? Bundle.main
+        return bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
     }
 
     /// Where people can support the project. The menu item is hidden while this is empty.
