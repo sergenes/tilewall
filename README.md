@@ -2,6 +2,8 @@
 
 See all your agents at once.
 
+![Twelve terminal windows tiled on one screen while focus moves from tile to tile](docs/demo.gif)
+
 tilewall is a small macOS tiler for people who run many terminal agents side by side.
 Every tiled window gets a slot in a grid, and the focused one grows to a quarter of the screen.
 The other windows stay in their slots and shrink, so nothing jumps around when focus moves.
@@ -10,6 +12,8 @@ In the default landscape layout the tiles run in rows.
 The focused row grows taller, and only the tiles in that row change width, so the other rows keep their widths and just get shorter.
 The portrait layout keeps every window in the same slot and flips the rule: the focused column grows wider, and only the tiles in that column change height.
 The other columns keep their heights and just get narrower.
+
+![Twelve terminal windows tiled, with the focused one taking a quarter of the screen](docs/screenshot.png)
 
 It arranges the windows you already have.
 Your agents keep running in Terminal, tmux, or any other app, and tilewall only moves and resizes their windows.
