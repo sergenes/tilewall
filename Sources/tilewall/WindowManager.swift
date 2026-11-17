@@ -109,9 +109,11 @@ final class WindowManager {
         var observer: AXObserver?
         let callback: AXObserverCallback = { _, _, notification, refcon in
             guard let refcon else { return }
-            // Titles can change many times a second, and only matter for rules with a title pattern.
-            let delay = (notification as String) == kAXTitleChangedNotification ? 1 : 0.03
-            Unmanaged<WindowManager>.fromOpaque(refcon).takeUnretainedValue().scheduleRetile(after: delay)
+            let manager = Unmanaged<WindowManager>.fromOpaque(refcon).takeUnretainedValue()
+            guard (notification as String) == kAXTitleChangedNotification else { return manager.scheduleRetile() }
+            // Terminal titles change many times a second while an agent works. They only decide anything
+            // when a rule has a title pattern, and then once a second is often enough.
+            if manager.config.rules.contains(where: { !($0.title ?? "").isEmpty }) { manager.scheduleRetile(after: 1) }
         }
         guard AXObserverCreate(pid, callback, &observer) == .success, let observer else { return }
         let element = AXUIElementCreateApplication(pid)
