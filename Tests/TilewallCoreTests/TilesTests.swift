@@ -78,33 +78,44 @@ final class TilesTests: XCTestCase {
     func testEqualTilesStayEqualWhileFocusStays() {
         var equal = EqualTiles()
         XCTAssertFalse(equal.isOn)
-        equal.set(true, focus: 7)
-        equal.observe(focus: 7, isTile: true)
-        equal.observe(focus: 7, isTile: true)
-        XCTAssertTrue(equal.isOn)
+        equal.set(["main"], focus: 7)
+        equal.observe(focus: 7, group: "main")
+        equal.observe(focus: 7, group: "main")
+        XCTAssertTrue(equal.isOn("main"))
     }
 
     func testFocusingAnotherTileEndsEqualTiles() {
         var equal = EqualTiles()
-        equal.set(true, focus: 7)
-        equal.observe(focus: 8, isTile: true)
+        equal.set(["main"], focus: 7)
+        equal.observe(focus: 8, group: "main")
         XCTAssertFalse(equal.isOn)
     }
 
     func testOtherWindowsDoNotEndEqualTilesButComingBackDoes() {
         var equal = EqualTiles()
-        equal.set(true, focus: 7)
-        equal.observe(focus: 99, isTile: false)
-        equal.observe(focus: nil, isTile: false)
+        equal.set(["main"], focus: 7)
+        equal.observe(focus: 99, group: nil)
+        equal.observe(focus: nil, group: nil)
         XCTAssertTrue(equal.isOn)
-        equal.observe(focus: 7, isTile: true)
+        equal.observe(focus: 7, group: "main")
+        XCTAssertFalse(equal.isOn)
+    }
+
+    func testEachDisplayEndsEqualTilesOnItsOwn() {
+        var equal = EqualTiles()
+        equal.set(["main", "left"], focus: 7)
+        equal.observe(focus: 8, group: "main")
+        XCTAssertFalse(equal.isOn("main"))
+        XCTAssertTrue(equal.isOn("left"))
+        XCTAssertTrue(equal.isOn)
+        equal.observe(focus: 20, group: "left")
         XCTAssertFalse(equal.isOn)
     }
 
     func testEqualTilesCanBeSwitchedOffByHand() {
         var equal = EqualTiles()
-        equal.set(true, focus: 7)
-        equal.set(false, focus: 7)
+        equal.set(["main", "left"], focus: 7)
+        equal.set([], focus: 7)
         XCTAssertFalse(equal.isOn)
     }
 

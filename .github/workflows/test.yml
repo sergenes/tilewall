@@ -24,6 +24,8 @@ jobs:
         run: swift build
       - name: Test
         run: swift test
+      - name: Changelog is up to date
+        run: ./scripts/changelog.sh --check
       - name: Release script without signing settings
         run: |
           ./scripts/release.sh

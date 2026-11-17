@@ -4,7 +4,7 @@
 <h1 align="center">tilewall</h1>
 <p align="center">See all your agents at once.</p>
 <p align="center">
-  <a href="https://github.com/sergenes/tilewall/releases/latest"><img src="https://img.shields.io/badge/version-0.3.0-4f8ff7" alt="version 0.3.0"></a>
+  <a href="https://github.com/sergenes/tilewall/releases/latest"><img src="https://img.shields.io/badge/version-0.3.1-4f8ff7" alt="version 0.3.1"></a>
   <a href="https://github.com/sergenes/tilewall/actions/workflows/test.yml"><img src="https://github.com/sergenes/tilewall/actions/workflows/test.yml/badge.svg" alt="test status"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-5cc78f" alt="macOS 13 or later">
   <img src="https://img.shields.io/badge/Apple%20silicon%20%2B%20Intel-universal-9e80f0" alt="universal binary">
@@ -42,6 +42,7 @@ The focused row grows taller, and only the tiles in that row change width, so th
 
 To see every tile at the same size, choose Equal Tiles in the menu or press ctrl+alt+e.
 The tiles stay equal until you focus one, which then grows again.
+With a group on each of two displays, focusing a tile on one screen leaves the other screen's tiles equal.
 
 ### Portrait layout
 
@@ -217,6 +218,7 @@ Any window of any app can be tiled by hand with `tilewall toggle`, whether a rul
 ## Behavior
 
 - Each display has its own group, and remembers its own focused tile.
+  Focus hotkeys, `tilewall move` and Equal Tiles act on the group of the focused tile, and leave the other display's group as it is.
 - A window joins the group of the display it is first seen on and stays in it, so a dragged group keeps its tiles.
   Use `tilewall send` to move a tile to another display.
 - Tiling can be switched off per display, in the menu or with `tilewall display <number> off`.
@@ -242,6 +244,8 @@ Any window of any app can be tiled by hand with `tilewall toggle`, whether a rul
 - `Sources/tilewall`: the daemon (Accessibility, hotkeys, menu bar) and the CLI, which talk over a Unix socket.
 - `scripts/release.sh`: builds, signs and notarizes the app.
   Signing settings live in `private/`, which is not part of the repository.
+- `scripts/publish.sh`: tags the version and creates the GitHub release from `docs/releases/<version>.md`.
+- `scripts/changelog.sh`: writes [CHANGELOG.md](CHANGELOG.md) from those release notes.
 
 ## License
 

@@ -66,11 +66,13 @@ final class HelpWindow {
         add("Tilewall arranges windows as tiles in a grid, so you can watch all of them at once. ")
         add("The focused tile grows to a quarter of the group. The other tiles keep their place and shrink.\n")
         add("Click a tile, or use the hotkeys below, to choose which one is large.\n")
+        add("Equal Tiles makes every tile the same size. A group stays equal until you focus one of its tiles.\n")
 
         heading("Which windows are tiles")
         let rules = config.rules.map { rule in rule.title.map { "\(rule.app) with a title matching \($0)" } ?? rule.app }
         add("Windows of these apps are tiled automatically: \(rules.isEmpty ? "none" : rules.joined(separator: ", ")).\n")
-        add("Any other window can be added by hand, and any tile can be taken out, with Include or Exclude Focused Window.\n")
+        add("Always Tile in the menu adds the app in front to that list, or removes it.\n")
+        add("Any single window can be added by hand, and any tile can be taken out, with Include or Exclude Focused Window.\n")
         add("Tile All tiles every matching window again. Untile All releases every tile so the windows can be moved freely.\n")
         add("Tabs are not windows. Use Split Tabs Into Windows to turn each tab into a tile.\n")
 
@@ -81,7 +83,8 @@ final class HelpWindow {
         add("Fill Screen puts the group back to full size.\n")
         add("Drop the group on another display and it fills that screen.\n")
         add("Tiling can be switched off per display in the menu. Windows there are left alone, also when that display is unplugged.\n")
-        add("Each display has its own group. Send Tile to Next Display moves a tile between them.\n")
+        add("Each display has its own group, with its own large tile. Send Tile to Next Display moves a tile between them, and so does a shift drag onto a tile of the other group.\n")
+        add("Move Tile Forward and Move Tile Back change a tile's place inside its group.\n")
 
         heading("Hotkeys")
         let table = NSMutableParagraphStyle()
@@ -101,6 +104,10 @@ final class HelpWindow {
         add("Choose Reload Config after editing it. Run ")
         add("tilewall help", font: .monospacedSystemFont(ofSize: 12, weight: .regular))
         add(" in a terminal for the command line.\n")
+
+        heading("Updates")
+        add("Once a day Tilewall asks GitHub whether a newer release exists, and shows it at the top of the menu. Nothing is downloaded. ")
+        add("Set checkForUpdates to false in the config file to switch that off.\n")
 
         heading("About")
         add("Tilewall \(App.version) is free and open source: \(App.sourceURL)\n")

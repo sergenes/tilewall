@@ -73,23 +73,29 @@ public enum TileOrder {
     }
 }
 
-/// "Equal tiles": no tile is enlarged, until focus arrives on a tile again.
+/// "Equal tiles": no tile of a group is enlarged, until focus arrives on one of that group's tiles again.
+/// Each display's group ends the mode on its own, so focusing a tile on one screen leaves the other screen equal.
 public struct EqualTiles: Equatable {
-    public private(set) var isOn = false
+    /// The groups, by display, that are equal right now.
+    public private(set) var groups: Set<String> = []
     private var seen: UInt32?
 
     public init() {}
 
-    /// Switches the mode. `focus` is the window that has focus right now, which stays equal until focus moves.
-    public mutating func set(_ on: Bool, focus: UInt32?) {
-        isOn = on
+    public var isOn: Bool { !groups.isEmpty }
+    public func isOn(_ group: String) -> Bool { groups.contains(group) }
+
+    /// Makes these groups equal, or none of them. `focus` is the window that has focus right now:
+    /// its group stays equal until focus moves.
+    public mutating func set(_ groups: Set<String>, focus: UInt32?) {
+        self.groups = groups
         seen = focus
     }
 
-    /// Call with the focused window on every retile. Focus arriving on a tile, from another tile or from
-    /// any other window, ends the mode, so the tile that was picked grows as usual.
-    public mutating func observe(focus: UInt32?, isTile: Bool) {
-        if isOn, isTile, focus != seen { isOn = false }
+    /// Call with the focused window on every retile. `group` is the group that window is a tile of, nil for any other window.
+    /// Focus arriving on a tile, from another tile or from any other window, lets that tile's group grow it as usual.
+    public mutating func observe(focus: UInt32?, group: String?) {
+        if let group, focus != seen { groups.remove(group) }
         seen = focus
     }
 }

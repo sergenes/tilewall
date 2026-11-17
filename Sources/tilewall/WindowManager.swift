@@ -275,14 +275,14 @@ final class WindowManager {
         }
         dragStarted = false
         reorderDrag = false
-        equal.observe(focus: focus, isTile: groups.contains { g in g.windows.contains { $0.id == focus } })
+        equal.observe(focus: focus, group: groups.first { g in g.windows.contains { $0.id == focus } }?.screen)
         raiseGroupIfEntered(focus: focus, groups: groups)
         var alive: Set<CGWindowID> = []
         for group in groups {
             let ids = group.windows.map(\.id)
             alive.formUnion(ids)
             if let focus, ids.contains(focus) { lastFocus[group.screen] = focus }
-            let focusIndex = equal.isOn ? nil : lastFocus[group.screen].flatMap { ids.firstIndex(of: $0) }
+            let focusIndex = equal.isOn(group.screen) ? nil : lastFocus[group.screen].flatMap { ids.firstIndex(of: $0) }
             Layout.arrange(count: ids.count, focused: focusIndex, area: group.area, options: config.layoutOptions) { index, target in
                 let window = group.windows[index]
                 // Apps such as Terminal snap to whole character cells, so compare against what the last apply produced.
@@ -549,7 +549,8 @@ final class WindowManager {
 
     /// Makes every tile the same size, or lets the focused one grow again. Nil flips.
     func setEqual(_ on: Bool?) -> String {
-        equal.set(on ?? !equal.isOn, focus: focusedWindow()?.id)
+        let groups = (on ?? !equal.isOn) ? Set(tiles().map(\.screen)) : []
+        equal.set(groups, focus: focusedWindow()?.id)
         applied.removeAll()
         retile()
         return equal.isOn ? "tiles are equal until you focus one" : "the focused tile grows"

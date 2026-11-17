@@ -13,6 +13,8 @@ cd "$(dirname "$0")/.."
 
 VERSION="$(cat VERSION)"
 grep -q "badge/version-$VERSION-" README.md || { echo "README.md version badge does not say $VERSION"; exit 1; }
+[[ -f "docs/releases/$VERSION.md" ]] || { echo "docs/releases/$VERSION.md is missing: write the release notes first"; exit 1; }
+./scripts/changelog.sh --check
 BUNDLE_ID="${BUNDLE_ID:-app.tilewall.tiler}"
 APP="dist/tilewall.app"
 ZIP="dist/tilewall-$VERSION.zip"
