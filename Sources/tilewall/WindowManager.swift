@@ -52,6 +52,12 @@ final class WindowManager {
     /// Set while a mouse button is down and the focused tile no longer sits where tilewall put it.
     private var userChangedTile = false
     private var dragLocation: CGPoint?
+    /// Set when the first movement of a drag is seen, and cleared when the button is released.
+    private var dragStarted = false
+    /// This drag was started with shift held: the tile moves alone and trades places with the tile it is dropped on.
+    private var reorderDrag = false
+    private var equal = EqualTiles()
+    var equalTiles: Bool { equal.isOn }
     /// The group that held the focused window at the last retile, nil when focus was outside every group.
     private var focusedGroup: String?
     private let backdrop = Backdrop()
@@ -263,15 +269,20 @@ final class WindowManager {
         var groups = tiles()
         if userChangedTile {
             userChangedTile = false
-            if adoptDropOnOtherDisplay(focus: focus, in: groups) || adoptUserResize(focus: focus, in: groups) { groups = tiles() }
+            let changed = reorderDrag ? adoptReorder(focus: focus, in: groups)
+                : adoptDropOnOtherDisplay(focus: focus, in: groups) || adoptUserResize(focus: focus, in: groups)
+            if changed { groups = tiles() }
         }
+        dragStarted = false
+        reorderDrag = false
+        equal.observe(focus: focus, isTile: groups.contains { g in g.windows.contains { $0.id == focus } })
         raiseGroupIfEntered(focus: focus, groups: groups)
         var alive: Set<CGWindowID> = []
         for group in groups {
             let ids = group.windows.map(\.id)
             alive.formUnion(ids)
             if let focus, ids.contains(focus) { lastFocus[group.screen] = focus }
-            let focusIndex = lastFocus[group.screen].flatMap { ids.firstIndex(of: $0) }
+            let focusIndex = equal.isOn ? nil : lastFocus[group.screen].flatMap { ids.firstIndex(of: $0) }
             Layout.arrange(count: ids.count, focused: focusIndex, area: group.area, options: config.layoutOptions) { index, target in
                 let window = group.windows[index]
                 // Apps such as Terminal snap to whole character cells, so compare against what the last apply produced.
@@ -319,6 +330,12 @@ final class WindowManager {
         guard change != .none else { return }
         userChangedTile = true
         guard case .moved(let dx, let dy) = change else { return }
+        if !dragStarted {
+            dragStarted = true
+            reorderDrag = NSEvent.modifierFlags.contains(.shift)
+        }
+        // A shift drag moves this tile alone. Where it is dropped decides its new slot, once the button is released.
+        guard !reorderDrag else { return }
         areas[group.screen] = group.area.offsetBy(dx: dx, dy: dy)
         lastGroups = lastGroups.map { $0.screen == group.screen ? Group(screen: $0.screen, name: $0.name, area: $0.area.offsetBy(dx: dx, dy: dy), windows: $0.windows) : $0 }
         for window in group.windows {
@@ -346,6 +363,29 @@ final class WindowManager {
         // Both screens go back to full size: the tiles join whatever is already tiled on the target.
         areas[group.screen] = nil
         areas[target] = nil
+        applied.removeAll()
+        save()
+        return true
+    }
+
+    /// After the button is released on a shift drag: the tile trades slots with the tile it was dropped on.
+    /// Dropped on a tile of another display, it joins that group in front of that tile. Dropped anywhere else, it goes back.
+    private func adoptReorder(focus: CGWindowID?, in groups: [Group]) -> Bool {
+        guard let focus, let own = groups.first(where: { g in g.windows.contains { $0.id == focus } }),
+              let primary = NSScreen.screens.first else { return false }
+        // The tile has to be laid out again whatever happens, either in its new slot or back in its old one.
+        applied[focus] = nil
+        let mouse = dragLocation ?? NSEvent.mouseLocation
+        dragLocation = nil
+        let drop = CGPoint(x: mouse.x, y: primary.frame.maxY - mouse.y)
+        let frames = groups.flatMap { g in g.windows.compactMap { w in applied[w.id].map { (id: w.id, frame: $0.result) } } }
+        guard let target = TileOrder.tile(at: drop, among: frames, excluding: focus),
+              let other = groups.first(where: { g in g.windows.contains { $0.id == target } }) else { return false }
+        let moved = other.screen == own.screen ? TileOrder.swapping(focus, with: target, in: order)
+                                               : TileOrder.placing(focus, before: target, in: order)
+        guard let moved else { return false }
+        order = moved
+        homes[focus] = other.screen
         applied.removeAll()
         save()
         return true
@@ -505,6 +545,14 @@ final class WindowManager {
         applied.removeAll()
         retile()
         return "moved \(w.id) \(w.app): \(w.title)"
+    }
+
+    /// Makes every tile the same size, or lets the focused one grow again. Nil flips.
+    func setEqual(_ on: Bool?) -> String {
+        equal.set(on ?? !equal.isOn, focus: focusedWindow()?.id)
+        applied.removeAll()
+        retile()
+        return equal.isOn ? "tiles are equal until you focus one" : "the focused tile grows"
     }
 
     func managedWindows() -> [Window] { tiles().flatMap(\.windows) }

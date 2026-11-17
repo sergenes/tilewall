@@ -4,7 +4,7 @@
 <h1 align="center">tilewall</h1>
 <p align="center">See all your agents at once.</p>
 <p align="center">
-  <a href="https://github.com/sergenes/tilewall/releases/latest"><img src="https://img.shields.io/badge/version-0.2.0-4f8ff7" alt="version 0.2.0"></a>
+  <a href="https://github.com/sergenes/tilewall/releases/latest"><img src="https://img.shields.io/badge/version-0.3.0-4f8ff7" alt="version 0.3.0"></a>
   <a href="https://github.com/sergenes/tilewall/actions/workflows/test.yml"><img src="https://github.com/sergenes/tilewall/actions/workflows/test.yml/badge.svg" alt="test status"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-5cc78f" alt="macOS 13 or later">
   <img src="https://img.shields.io/badge/Apple%20silicon%20%2B%20Intel-universal-9e80f0" alt="universal binary">
@@ -40,6 +40,9 @@ The focused row grows taller, and only the tiles in that row change width, so th
 
 ![Twelve terminal windows tiled, with the focused one taking a quarter of the screen](docs/screenshot.png)
 
+To see every tile at the same size, choose Equal Tiles in the menu or press ctrl+alt+e.
+The tiles stay equal until you focus one, which then grows again.
+
 ### Portrait layout
 
 The portrait layout keeps every window in the same slot and flips the rule: the focused column grows wider, and only the tiles in that column change height.
@@ -53,6 +56,7 @@ Switch with Portrait Layout in the menu or `tilewall orientation portrait`.
 Resize one tile by its corner and the whole group scales with it.
 Drag one tile by its title bar and the whole group moves.
 `tilewall fill`, or ctrl+alt+f, makes the group fill the screen again.
+Hold shift while dragging to move one tile instead of the group: drop it on another tile and the two trade places.
 
 ![A group of tiles being resized, dragged and then filling the screen again](docs/group.gif)
 
@@ -114,6 +118,7 @@ tilewall toggle 9154      # the same for a window id from `tilewall status --all
 tilewall focus next       # also: prev, or a window id
 tilewall move next        # swap the focused tile with the next one; also: prev, and a window id
 tilewall orientation portrait   # the focused column grows instead of the focused row; `landscape` switches back
+tilewall even             # make every tile the same size until one is focused; also: on, off
 tilewall fill             # make every group fill its screen again
 tilewall area -1700 100 1200 700   # place the focused group: x y width height, from the top left of the main display
 tilewall send             # move the focused tile to the group of the next display
@@ -162,6 +167,7 @@ The menu bar menu shows the current keys next to each action, and `tilewall guid
 | ctrl+alt+t | include or exclude the focused window |
 | ctrl+alt+d / ctrl+alt+a | focus the next / previous tile |
 | ctrl+alt+shift+d / ctrl+alt+shift+a | move the focused tile forward / back one slot |
+| ctrl+alt+e | make every tile the same size, until one is focused |
 | ctrl+alt+f | make every group fill its screen again |
 | ctrl+alt+s | send the focused tile to the next display |
 | ctrl+alt+r | retile now |
@@ -182,7 +188,7 @@ Run `tilewall reload` after editing it.
   "backdrop": "auto",
   "orientation": "landscape",
   "checkForUpdates": true,
-  "hotkeys": { "toggle": "ctrl+alt+t", "next": "ctrl+alt+d", "prev": "ctrl+alt+a", "forward": "ctrl+alt+shift+d", "back": "ctrl+alt+shift+a", "fill": "ctrl+alt+f", "send": "ctrl+alt+s", "retile": "ctrl+alt+r", "pause": "ctrl+alt+z", "help": "ctrl+alt+q" }
+  "hotkeys": { "toggle": "ctrl+alt+t", "next": "ctrl+alt+d", "prev": "ctrl+alt+a", "forward": "ctrl+alt+shift+d", "back": "ctrl+alt+shift+a", "even": "ctrl+alt+e", "fill": "ctrl+alt+f", "send": "ctrl+alt+s", "retile": "ctrl+alt+r", "pause": "ctrl+alt+z", "help": "ctrl+alt+q" }
 }
 ```
 
@@ -226,6 +232,8 @@ Any window of any app can be tiled by hand with `tilewall toggle`, whether a rul
 - With three or fewer tiles the focused one is larger than a quarter, because there is nothing else to fill the screen.
 - Tiles sit in the order their windows were first seen.
   `tilewall move next` and `tilewall move prev` swap a tile with its neighbour.
+  A shift drag does the same with the mouse: the dragged tile and the tile it is dropped on trade places.
+  Dropped on a tile of another display, it joins that group in front of that tile, and dropped anywhere else it goes back.
 - To take one window out of the group, exclude it with `tilewall toggle`.
 
 ## Layout of the code

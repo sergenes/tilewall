@@ -44,11 +44,53 @@ public enum TileOrder {
         return result
     }
 
+    /// A tile dropped on another tile of its group: the two trade slots. Nil when either is unknown or they are the same.
+    public static func swapping(_ id: UInt32, with other: UInt32, in order: [UInt32]) -> [UInt32]? {
+        guard id != other, let a = order.firstIndex(of: id), let b = order.firstIndex(of: other) else { return nil }
+        var result = order
+        result.swapAt(a, b)
+        return result
+    }
+
+    /// A tile dropped on a tile of another group: it goes in front of that tile, which keeps the other group's order intact.
+    public static func placing(_ id: UInt32, before other: UInt32, in order: [UInt32]) -> [UInt32]? {
+        guard id != other, order.contains(id), order.contains(other) else { return nil }
+        var result = order.filter { $0 != id }
+        result.insert(id, at: result.firstIndex(of: other)!)
+        return result
+    }
+
+    /// The tile under a point, ignoring the one being dragged.
+    public static func tile(at point: CGPoint, among frames: [(id: UInt32, frame: CGRect)], excluding dragged: UInt32) -> UInt32? {
+        frames.first { $0.id != dragged && $0.frame.contains(point) }?.id
+    }
+
     /// The index focus moves to from `current`, wrapping around. Without a current tile focus goes to the first one.
     public static func cycled(from current: Int?, by step: Int, count: Int) -> Int? {
         guard count > 0 else { return nil }
         guard let current else { return 0 }
         return ((current + step) % count + count) % count
+    }
+}
+
+/// "Equal tiles": no tile is enlarged, until focus arrives on a tile again.
+public struct EqualTiles: Equatable {
+    public private(set) var isOn = false
+    private var seen: UInt32?
+
+    public init() {}
+
+    /// Switches the mode. `focus` is the window that has focus right now, which stays equal until focus moves.
+    public mutating func set(_ on: Bool, focus: UInt32?) {
+        isOn = on
+        seen = focus
+    }
+
+    /// Call with the focused window on every retile. Focus arriving on a tile, from another tile or from
+    /// any other window, ends the mode, so the tile that was picked grows as usual.
+    public mutating func observe(focus: UInt32?, isTile: Bool) {
+        if isOn, isTile, focus != seen { isOn = false }
+        seen = focus
     }
 }
 

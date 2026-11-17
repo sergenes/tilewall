@@ -87,6 +87,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case "forward": _ = manager.move(1, id: nil)
         case "back": _ = manager.move(-1, id: nil)
         case "fill": _ = manager.fillScreens()
+        case "even": _ = manager.setEqual(nil)
         case "send": _ = manager.send(id: nil)
         case "retile": manager.retile()
         case "pause": _ = manager.setPaused(!manager.paused)
@@ -159,6 +160,9 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case "all": reply(manager.tileAll())
         case "none": reply(manager.untileAll())
         case "fill": reply(manager.fillScreens())
+        case "even":
+            guard parts.count <= 2, parts.count == 1 || ["on", "off"].contains(parts[1]) else { return reply("error: usage: tilewall even [on|off]") }
+            reply(manager.setEqual(parts.count == 2 ? parts[1] == "on" : nil))
         case "send": reply(manager.send(id: id))
         case "area":
             let numbers = parts.dropFirst().compactMap(Double.init)
@@ -267,6 +271,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if NSScreen.screens.count > 1 { addAction("send", symbol: "display.2") }
 
         section("Layout")
+        addAction("even", symbol: "square.grid.3x3", on: manager.equalTiles)
         addAction("fill", symbol: "arrow.up.left.and.arrow.down.right")
         addAction("retile", symbol: "arrow.clockwise")
         add("Portrait Layout", symbol: "rectangle.portrait",

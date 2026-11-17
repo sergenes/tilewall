@@ -8,6 +8,7 @@ let hotkeyActions: [(name: String, title: String, detail: String)] = [
     ("prev", "Focus Previous Tile", "Moves focus to the previous tile."),
     ("forward", "Move Tile Forward", "Swaps the focused tile with the next one, so it takes that slot."),
     ("back", "Move Tile Back", "Swaps the focused tile with the previous one."),
+    ("even", "Equal Tiles", "Makes every tile the same size. The next tile you focus grows again."),
     ("fill", "Fill Screen", "Puts every group back to filling its whole screen."),
     ("send", "Send Tile to Next Display", "Moves the focused tile to the group on the next display."),
     ("retile", "Retile Now", "Lays the tiles out again."),
@@ -75,6 +76,7 @@ final class HelpWindow {
 
         heading("The group works like one window")
         add("Drag any tile by its title bar to move the whole group.\n")
+        add("Hold shift while dragging to move one tile: drop it on another tile and the two trade places.\n")
         add("Resize any tile by an edge or corner to scale the whole group, for example to see the desktop behind it.\n")
         add("Fill Screen puts the group back to full size.\n")
         add("Drop the group on another display and it fills that screen.\n")

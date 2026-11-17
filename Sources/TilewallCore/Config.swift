@@ -69,6 +69,7 @@ public struct Config: Codable, Equatable {
         "forward": "ctrl+alt+shift+d",
         "back": "ctrl+alt+shift+a",
         "fill": "ctrl+alt+f",
+        "even": "ctrl+alt+e",
         "send": "ctrl+alt+s",
         "retile": "ctrl+alt+r",
         "pause": "ctrl+alt+z",

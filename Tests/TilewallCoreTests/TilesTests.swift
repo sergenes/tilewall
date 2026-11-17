@@ -50,6 +50,64 @@ final class TilesTests: XCTestCase {
         XCTAssertNil(TileOrder.moving(99, by: 1, in: order, order: order))
     }
 
+    func testDroppingATileOnAnotherTradesTheirSlots() {
+        XCTAssertEqual(TileOrder.swapping(10, with: 50, in: [10, 20, 30, 40, 50]), [50, 20, 30, 40, 10])
+        XCTAssertNil(TileOrder.swapping(10, with: 10, in: [10, 20]))
+        XCTAssertNil(TileOrder.swapping(10, with: 99, in: [10, 20]))
+    }
+
+    func testDroppingATileOnAnotherGroupPutsItInFrontOfTheTarget() {
+        XCTAssertEqual(TileOrder.placing(10, before: 40, in: [10, 20, 30, 40, 50]), [20, 30, 10, 40, 50])
+        XCTAssertEqual(TileOrder.placing(50, before: 10, in: [10, 20, 30, 40, 50]), [50, 10, 20, 30, 40])
+        XCTAssertNil(TileOrder.placing(10, before: 10, in: [10, 20]))
+        XCTAssertNil(TileOrder.placing(99, before: 10, in: [10, 20]))
+    }
+
+    func testTheTileUnderTheDropPoint() {
+        let frames: [(id: UInt32, frame: CGRect)] = [
+            (1, CGRect(x: 0, y: 0, width: 100, height: 100)), (2, CGRect(x: 100, y: 0, width: 100, height: 100)),
+        ]
+        XCTAssertEqual(TileOrder.tile(at: CGPoint(x: 150, y: 50), among: frames, excluding: 1), 2)
+        // The dragged tile itself is under the pointer for the whole drag and never counts.
+        XCTAssertNil(TileOrder.tile(at: CGPoint(x: 50, y: 50), among: frames, excluding: 1))
+        XCTAssertNil(TileOrder.tile(at: CGPoint(x: 500, y: 500), among: frames, excluding: 1))
+    }
+
+    // MARK: Equal tiles
+
+    func testEqualTilesStayEqualWhileFocusStays() {
+        var equal = EqualTiles()
+        XCTAssertFalse(equal.isOn)
+        equal.set(true, focus: 7)
+        equal.observe(focus: 7, isTile: true)
+        equal.observe(focus: 7, isTile: true)
+        XCTAssertTrue(equal.isOn)
+    }
+
+    func testFocusingAnotherTileEndsEqualTiles() {
+        var equal = EqualTiles()
+        equal.set(true, focus: 7)
+        equal.observe(focus: 8, isTile: true)
+        XCTAssertFalse(equal.isOn)
+    }
+
+    func testOtherWindowsDoNotEndEqualTilesButComingBackDoes() {
+        var equal = EqualTiles()
+        equal.set(true, focus: 7)
+        equal.observe(focus: 99, isTile: false)
+        equal.observe(focus: nil, isTile: false)
+        XCTAssertTrue(equal.isOn)
+        equal.observe(focus: 7, isTile: true)
+        XCTAssertFalse(equal.isOn)
+    }
+
+    func testEqualTilesCanBeSwitchedOffByHand() {
+        var equal = EqualTiles()
+        equal.set(true, focus: 7)
+        equal.set(false, focus: 7)
+        XCTAssertFalse(equal.isOn)
+    }
+
     func testFocusCyclesAndWraps() {
         XCTAssertEqual(TileOrder.cycled(from: 0, by: 1, count: 3), 1)
         XCTAssertEqual(TileOrder.cycled(from: 2, by: 1, count: 3), 0)

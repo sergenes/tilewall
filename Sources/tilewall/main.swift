@@ -17,6 +17,7 @@ tilewall: tiles windows in a grid and grows the focused one to a quarter of the 
   tilewall focus next|prev|<id>
   tilewall move next|prev [id]   swap a tile with its neighbour, so it takes that slot
   tilewall orientation [landscape|portrait]   tiles in rows, or in columns
+  tilewall even [on|off]    make every tile the same size, until you focus one
   tilewall fill             make every group fill its screen again
   tilewall area <x> <y> <width> <height>   place the focused group, origin at the top left of the main display
   tilewall display [<number> on|off]   list displays, or switch tiling on or off for one
