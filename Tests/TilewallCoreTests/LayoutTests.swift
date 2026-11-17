@@ -286,7 +286,7 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(config.gap, 12)
         XCTAssertEqual(config.focusFraction, 0.5)
         XCTAssertEqual(try JSONDecoder().decode(Config.self, from: Data("{}".utf8)).gap, 0)
-        XCTAssertEqual(config.rules, [Rule(app: "com.apple.Terminal")])
+        XCTAssertEqual(config.rules, Config.defaultRules)
         XCTAssertEqual(config.hotkeys["toggle"], "")
         XCTAssertEqual(config.hotkeys["next"], "ctrl+alt+d")
         XCTAssertEqual(config.backdrop, "auto")

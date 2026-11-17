@@ -117,6 +117,34 @@ final class TilesTests: XCTestCase {
 
     // MARK: Rules
 
+    func testTerminalAppsAreTiledByDefault() {
+        let config = Config()
+        for id in ["com.apple.Terminal", "com.googlecode.iterm2", "com.mitchellh.ghostty"] {
+            XCTAssertFalse(config.rules(forBundleID: id, appName: nil).isEmpty, id)
+        }
+        XCTAssertTrue(config.rules(forBundleID: "com.apple.Safari", appName: "Safari").isEmpty)
+    }
+
+    func testAddingARuleOnce() {
+        var config = Config(rules: [])
+        XCTAssertTrue(config.addRule(app: "com.apple.Safari"))
+        XCTAssertFalse(config.addRule(app: "COM.APPLE.SAFARI"))
+        XCTAssertEqual(config.rules, [Rule(app: "com.apple.Safari")])
+    }
+
+    func testAddingARuleNextToATitleRuleTilesEveryWindow() {
+        var config = Config(rules: [Rule(app: "Terminal", title: "^tmux")])
+        XCTAssertTrue(config.addRule(app: "Terminal"))
+        XCTAssertEqual(config.rules.count, 2)
+    }
+
+    func testRemovingRulesByBundleIDOrName() {
+        var config = Config(rules: [Rule(app: "com.apple.Terminal"), Rule(app: "Terminal", title: "^tmux"), Rule(app: "com.apple.Safari")])
+        XCTAssertEqual(config.removeRules(bundleID: "com.apple.Terminal", appName: "Terminal"), 2)
+        XCTAssertEqual(config.rules, [Rule(app: "com.apple.Safari")])
+        XCTAssertEqual(config.removeRules(bundleID: "org.example", appName: "Example"), 0)
+    }
+
     func testInvalidTitlePatternMatchesNothing() {
         let rule = Rule(app: "Terminal", title: "([")
         XCTAssertFalse(rule.matches(bundleID: nil, appName: "Terminal", title: "anything"))

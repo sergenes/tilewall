@@ -10,6 +10,7 @@ tilewall: tiles windows in a grid and grows the focused one to a quarter of the 
   tilewall status [--all]   list tiles, with --all also the visible windows that are not tiled
   tilewall all              tile every window the rules match, undoing manual excludes
   tilewall none             release every tile on the current space
+  tilewall rule [add|remove <app>]   list the apps that are tiled automatically, or change them
   tilewall toggle [id]      include or exclude the focused window, or the window with that id
   tilewall include [id]     tile a window
   tilewall exclude [id]     stop tiling a window

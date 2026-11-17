@@ -19,7 +19,7 @@ Every tiled window gets a slot in a grid, and the focused one grows to a quarter
 The other windows stay in their slots and shrink, so nothing jumps around when focus moves.
 
 It arranges the windows you already have.
-Your agents keep running in Terminal, tmux, or any other app, and tilewall only moves and resizes their windows.
+Your agents keep running in Terminal, iTerm2, Ghostty, tmux, or any other app, and tilewall only moves and resizes their windows.
 
 tilewall is free and open source under the MIT license.
 It pairs well with [Agents At Work](https://agentsatwork.app), which runs agents in tmux sessions and lets you control them from a phone.
@@ -100,6 +100,8 @@ A binary started from a terminal uses that terminal's Accessibility permission.
 tilewall start            # start the daemon in the background
 tilewall untab            # move every tab of the rule-matched apps into its own window
 tilewall status --all     # tiles, plus the visible windows that are not tiled
+tilewall rule             # list the apps that are tiled automatically
+tilewall rule add Ghostty # tile every window of an app; `rule remove` undoes it
 tilewall all              # tile every window the rules match, undoing manual excludes
 tilewall none             # release every tile on the current space
 tilewall toggle           # include or exclude the focused window
@@ -167,7 +169,7 @@ Run `tilewall reload` after editing it.
 
 ```json
 {
-  "rules": [{ "app": "com.apple.Terminal" }],
+  "rules": [{ "app": "com.apple.Terminal" }, { "app": "com.googlecode.iterm2" }],
   "focusFraction": 0.5,
   "gap": 0,
   "targetAspect": 1.5,
@@ -178,6 +180,9 @@ Run `tilewall reload` after editing it.
 ```
 
 - `rules`: windows that are tiled automatically.
+  A new config tiles Terminal, iTerm2, Ghostty, kitty, WezTerm, Alacritty and Warp.
+  Only Terminal has been tested so far.
+  Always Tile in the menu, or `tilewall rule add <app>`, adds a rule for any other app.
   `app` is a bundle identifier or an app name.
   The optional `title` is a regular expression, for example `{ "app": "Terminal", "title": "tmux attach -t =aaw-" }` tiles only the agent sessions.
 - `focusFraction`: the share of each screen axis the focused tile takes, so 0.5 is a quarter of the screen.

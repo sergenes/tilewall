@@ -12,9 +12,14 @@ public struct Rule: Codable, Equatable {
         self.title = title
     }
 
-    public func matches(bundleID: String?, appName: String?, title windowTitle: String) -> Bool {
+    /// Whether the rule is about this app, ignoring its title pattern.
+    public func matches(bundleID: String?, appName: String?) -> Bool {
         let wanted = app.lowercased()
-        guard bundleID?.lowercased() == wanted || appName?.lowercased() == wanted else { return false }
+        return bundleID?.lowercased() == wanted || appName?.lowercased() == wanted
+    }
+
+    public func matches(bundleID: String?, appName: String?, title windowTitle: String) -> Bool {
+        guard matches(bundleID: bundleID, appName: appName) else { return false }
         guard let pattern = title, !pattern.isEmpty else { return true }
         guard let regex = Rule.regex(pattern) else { return false }
         let range = NSRange(windowTitle.startIndex..., in: windowTitle)
@@ -48,6 +53,12 @@ public struct Config: Codable, Equatable {
     /// "landscape" lays tiles out in rows, "portrait" in columns.
     public var orientation: Orientation
 
+    /// Terminal apps are tiled out of the box. An app that is not installed simply never matches.
+    public static let defaultRules: [Rule] = [
+        "com.apple.Terminal", "com.googlecode.iterm2", "com.mitchellh.ghostty", "net.kovidgoyal.kitty",
+        "com.github.wez.wezterm", "org.alacritty", "dev.warp.Warp-Stable",
+    ].map { Rule(app: $0) }
+
     /// All defaults sit under the left hand, next to the left control and option keys.
     public static let defaultHotkeys: [String: String] = [
         "toggle": "ctrl+alt+t",
@@ -63,7 +74,7 @@ public struct Config: Codable, Equatable {
     ]
 
     public init(
-        rules: [Rule] = [Rule(app: "com.apple.Terminal")],
+        rules: [Rule] = Config.defaultRules,
         focusFraction: Double = 0.5,
         gap: Double = 0,
         targetAspect: Double = 1.5,
@@ -96,6 +107,28 @@ public struct Config: Codable, Equatable {
         guard gap >= 0 else {
             throw DecodingError.dataCorruptedError(forKey: .gap, in: c, debugDescription: "gap must not be negative")
         }
+    }
+
+    /// Rules that apply to this app, whatever their title pattern.
+    public func rules(forBundleID bundleID: String?, appName: String?) -> [Rule] {
+        rules.filter { $0.matches(bundleID: bundleID, appName: appName) }
+    }
+
+    /// Tiles every window of the app. False when a rule without a title pattern already does.
+    @discardableResult
+    public mutating func addRule(app: String) -> Bool {
+        let wanted = app.lowercased()
+        guard !rules.contains(where: { $0.app.lowercased() == wanted && ($0.title ?? "").isEmpty }) else { return false }
+        rules.append(Rule(app: app))
+        return true
+    }
+
+    /// Removes every rule for the app, given by bundle identifier or name. Returns how many were removed.
+    @discardableResult
+    public mutating func removeRules(bundleID: String?, appName: String?) -> Int {
+        let before = rules.count
+        rules.removeAll { $0.matches(bundleID: bundleID, appName: appName) }
+        return before - rules.count
     }
 
     public var layoutOptions: LayoutOptions {

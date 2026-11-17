@@ -189,9 +189,8 @@ final class WindowManager {
             .filter { $0.activationPolicy == .regular && !$0.isHidden && $0.processIdentifier != getpid() }
             .filter { app in
                 guard candidatesOnly else { return true }
-                return includedPids.contains(app.processIdentifier) || config.rules.contains {
-                    Rule(app: $0.app).matches(bundleID: app.bundleIdentifier, appName: app.localizedName, title: "")
-                }
+                return includedPids.contains(app.processIdentifier)
+                    || !config.rules(forBundleID: app.bundleIdentifier, appName: app.localizedName).isEmpty
             }
             .flatMap(windows(of:))
             .filter { onScreen[$0.id] != nil }
@@ -415,6 +414,37 @@ final class WindowManager {
         } catch {
             return "error: invalid config, keeping the old one: \(error)"
         }
+    }
+
+    // MARK: Rules
+
+    func hasRule(for app: NSRunningApplication) -> Bool {
+        !config.rules(forBundleID: app.bundleIdentifier, appName: app.localizedName).isEmpty
+    }
+
+    /// Adds or removes the rule that tiles every window of an app, and stores it in the config file.
+    /// `app` is a bundle identifier or a name. A running app given by name is stored by its bundle identifier.
+    func setRule(_ on: Bool, app: String) -> String {
+        let running = NSWorkspace.shared.runningApplications.first {
+            $0.activationPolicy == .regular && Rule(app: app).matches(bundleID: $0.bundleIdentifier, appName: $0.localizedName)
+        }
+        var changed = config
+        if on {
+            guard changed.addRule(app: running?.bundleIdentifier ?? app) else { return "\(app) is already tiled by a rule" }
+        } else {
+            guard changed.removeRules(bundleID: running?.bundleIdentifier ?? app, appName: running?.localizedName ?? app) > 0 else {
+                return "error: no rule for \(app)"
+            }
+        }
+        do { try ConfigStore.save(changed) } catch { return "error: cannot write the config: \(error.localizedDescription)" }
+        config = changed
+        applied.removeAll()
+        retile()
+        return on ? "added a rule for \(running?.bundleIdentifier ?? app)" : "removed the rules for \(app)"
+    }
+
+    func rulesText() -> String {
+        config.rules.isEmpty ? "no rules" : config.rules.map { rule in rule.title.map { "\(rule.app)  title /\($0)/" } ?? rule.app }.joined(separator: "\n")
     }
 
     /// include: true adds, false removes, nil flips.

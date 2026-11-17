@@ -8,6 +8,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var menuWindows: [Window] = []
     private var menuDisplays: [String] = []
+    private var menuApp: NSRunningApplication?
     private let help = HelpWindow()
 
     static func run() -> Never {
@@ -112,6 +113,14 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 return reply("error: usage: tilewall move next|prev [<window id>]")
             }
             reply(manager.move(parts[1] == "next" ? 1 : -1, id: target))
+        case "rule", "rules":
+            let app = parts.dropFirst(2).joined(separator: " ")
+            switch parts.dropFirst().first {
+            case nil: reply(manager.rulesText())
+            case "add" where !app.isEmpty: reply(manager.setRule(true, app: app))
+            case "remove" where !app.isEmpty: reply(manager.setRule(false, app: app))
+            default: reply("error: usage: tilewall rule [add|remove <app name or bundle id>]")
+            }
         case "retile": manager.retile(); reply("retiled")
         case "orientation":
             guard parts.count == 2, let orientation = Orientation(rawValue: parts[1]) else {
@@ -219,6 +228,12 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         add("Untile All", symbol: "square.dashed", hint: "Releases every tile on this space. The windows stay where they are and can be moved freely.",
             action: #selector(untileAll))
         addAction("toggle", symbol: "plus.forwardslash.minus")
+        if let front = NSWorkspace.shared.frontmostApplication, front.processIdentifier != getpid(), front.activationPolicy == .regular {
+            menuApp = front
+            add("Always Tile \(front.localizedName ?? "This App")", symbol: "app.badge.checkmark",
+                hint: "On: every window of this app is tiled, now and in the future. This adds a rule to the config file.",
+                action: #selector(toggleAppRule), on: manager.hasRule(for: front))
+        }
         addAction("next", symbol: "arrow.right")
         addAction("prev", symbol: "arrow.left")
         addAction("forward", symbol: "arrow.right.to.line")
@@ -321,6 +336,10 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func toggleDisplay(_ sender: NSMenuItem) {
         guard menuDisplays.indices.contains(sender.tag) else { return }
         log(manager.setTiled(sender.state != .on, display: menuDisplays[sender.tag]))
+    }
+    @objc private func toggleAppRule(_ sender: NSMenuItem) {
+        guard let app = menuApp, let name = app.bundleIdentifier ?? app.localizedName else { return }
+        log(manager.setRule(sender.state != .on, app: name))
     }
     @objc private func toggleOrientation() {
         log(manager.setOrientation(manager.config.orientation == .portrait ? .landscape : .portrait))
