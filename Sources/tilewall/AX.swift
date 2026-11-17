@@ -20,6 +20,25 @@ extension AXUIElement {
         return (v as! AXUIElement)
     }
 
+    /// Several attributes in one round trip to the app. A missing attribute is nil.
+    func values(_ names: [String]) -> [CFTypeRef?] {
+        var out: CFArray?
+        guard AXUIElementCopyMultipleAttributeValues(self, names as CFArray, [], &out) == .success,
+              let found = out as? [AnyObject], found.count == names.count else { return names.map { _ in nil } }
+        return found.map { value in
+            if CFGetTypeID(value) == AXValueGetTypeID(), AXValueGetType(value as! AXValue) == .axError { return nil }
+            return value
+        }
+    }
+
+    static func frame(position: CFTypeRef?, size: CFTypeRef?) -> CGRect? {
+        guard let p = position, let s = size, CFGetTypeID(p) == AXValueGetTypeID(), CFGetTypeID(s) == AXValueGetTypeID() else { return nil }
+        var point = CGPoint.zero
+        var extent = CGSize.zero
+        guard AXValueGetValue(p as! AXValue, .cgPoint, &point), AXValueGetValue(s as! AXValue, .cgSize, &extent) else { return nil }
+        return CGRect(origin: point, size: extent)
+    }
+
     var windowID: CGWindowID? {
         var id: CGWindowID = 0
         return _AXUIElementGetWindow(self, &id) == .success && id != 0 ? id : nil
@@ -27,13 +46,8 @@ extension AXUIElement {
 
     /// Frame in accessibility coordinates: origin at the top left of the primary screen, y grows down.
     var frame: CGRect? {
-        guard let p = value(kAXPositionAttribute), let s = value(kAXSizeAttribute),
-              CFGetTypeID(p) == AXValueGetTypeID(), CFGetTypeID(s) == AXValueGetTypeID() else { return nil }
-        var point = CGPoint.zero
-        var size = CGSize.zero
-        AXValueGetValue(p as! AXValue, .cgPoint, &point)
-        AXValueGetValue(s as! AXValue, .cgSize, &size)
-        return CGRect(origin: point, size: size)
+        let found = values([kAXPositionAttribute, kAXSizeAttribute])
+        return AXUIElement.frame(position: found[0], size: found[1])
     }
 
     func setFrame(_ rect: CGRect) {

@@ -8,6 +8,8 @@ struct Window {
     let app: String
     let bundleID: String?
     let title: String
+    /// Where the window was when it was listed. Ask `element.frame` after moving it.
+    let frame: CGRect?
     let element: AXUIElement
 }
 
@@ -58,6 +60,10 @@ final class WindowManager {
     private static let minGroupSize = CGSize(width: 320, height: 200)
     private var observers: [pid_t: AXObserver] = [:]
     private var pending: DispatchWorkItem?
+    private var pendingDue = Date.distantPast
+    private var lastPrune = Date.distantPast
+    private static let reconcileInterval: TimeInterval = 5
+    private static let pruneInterval: TimeInterval = 30
     private var poll: Timer?
 
     init(config: Config) {
@@ -94,8 +100,9 @@ final class WindowManager {
             self?.scheduleRetile()
         }
         NSWorkspace.shared.runningApplications.forEach(observe)
-        // Closed windows and anything the notifications miss are picked up by this slow reconcile.
-        poll = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.retile() }
+        // Notifications drive the tiling. This slow reconcile only picks up what they miss.
+        poll = Timer.scheduledTimer(withTimeInterval: WindowManager.reconcileInterval, repeats: true) { [weak self] _ in self?.retile() }
+        poll?.tolerance = 1
         retile()
     }
 
@@ -103,26 +110,34 @@ final class WindowManager {
         let pid = app.processIdentifier
         guard app.activationPolicy == .regular, observers[pid] == nil, pid != getpid() else { return }
         var observer: AXObserver?
-        let callback: AXObserverCallback = { _, _, _, refcon in
+        let callback: AXObserverCallback = { _, _, notification, refcon in
             guard let refcon else { return }
-            Unmanaged<WindowManager>.fromOpaque(refcon).takeUnretainedValue().scheduleRetile()
+            // Titles can change many times a second, and only matter for rules with a title pattern.
+            let delay = (notification as String) == kAXTitleChangedNotification ? 1 : 0.03
+            Unmanaged<WindowManager>.fromOpaque(refcon).takeUnretainedValue().scheduleRetile(after: delay)
         }
         guard AXObserverCreate(pid, callback, &observer) == .success, let observer else { return }
         let element = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(element, 1)
         let refcon = Unmanaged.passUnretained(self).toOpaque()
         for name in [kAXFocusedWindowChangedNotification, kAXMainWindowChangedNotification, kAXWindowCreatedNotification,
-                     kAXWindowMiniaturizedNotification, kAXWindowDeminiaturizedNotification] {
+                     kAXWindowMiniaturizedNotification, kAXWindowDeminiaturizedNotification,
+                     kAXWindowMovedNotification, kAXWindowResizedNotification, kAXUIElementDestroyedNotification,
+                     kAXTitleChangedNotification] {
             AXObserverAddNotification(observer, element, name as CFString, refcon)
         }
         CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
         observers[pid] = observer
     }
 
+    /// Retiles soon. A burst of notifications leads to one retile: a request never postpones one that is already due earlier.
     func scheduleRetile(after delay: TimeInterval = 0.03) {
+        let due = Date().addingTimeInterval(delay)
+        if pending != nil, pendingDue <= due { return }
         pending?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.retile() }
         pending = work
+        pendingDue = due
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
@@ -134,13 +149,18 @@ final class WindowManager {
         return element.elements(kAXWindowsAttribute).compactMap { describe($0, app: app) }
     }
 
+    private static let described = [kAXSubroleAttribute, kAXMinimizedAttribute, "AXFullScreen", kAXTitleAttribute,
+                                    kAXPositionAttribute, kAXSizeAttribute]
+
     private func describe(_ element: AXUIElement, app: NSRunningApplication) -> Window? {
-        guard element.string(kAXSubroleAttribute) == (kAXStandardWindowSubrole as String),
-              element.bool(kAXMinimizedAttribute) != true,
-              element.bool("AXFullScreen") != true,
+        // One round trip per window: this runs for every window on every retile.
+        let found = element.values(WindowManager.described)
+        guard found[0] as? String == (kAXStandardWindowSubrole as String),
+              found[1] as? Bool != true,
+              found[2] as? Bool != true,
               let id = element.windowID else { return nil }
         return Window(id: id, pid: app.processIdentifier, app: app.localizedName ?? "?", bundleID: app.bundleIdentifier,
-                      title: element.string(kAXTitleAttribute) ?? "", element: element)
+                      title: found[3] as? String ?? "", frame: AXUIElement.frame(position: found[4], size: found[5]), element: element)
     }
 
     private func matchesRule(_ w: Window) -> Bool {
@@ -224,7 +244,7 @@ final class WindowManager {
 
     /// The display a window is on right now, judged by its center.
     private func display(of window: Window, in screens: [Display]) -> String? {
-        guard let frame = window.element.frame, !screens.isEmpty else { return nil }
+        guard let frame = window.frame, !screens.isEmpty else { return nil }
         let center = CGPoint(x: frame.midX, y: frame.midY)
         return (screens.first { $0.area.contains(center) } ?? screens.min {
             distance(center, to: $0.area) < distance(center, to: $1.area)
@@ -266,7 +286,7 @@ final class WindowManager {
             Layout.arrange(count: ids.count, focused: focusIndex, area: group.area, options: config.layoutOptions) { index, target in
                 let window = group.windows[index]
                 // Apps such as Terminal snap to whole character cells, so compare against what the last apply produced.
-                if let last = applied[window.id], last.target == target, window.element.frame == last.result {
+                if let last = applied[window.id], last.target == target, window.frame == last.result {
                     return last.result.size
                 }
                 window.element.setFrame(target)
@@ -304,7 +324,7 @@ final class WindowManager {
     private func followDrag() {
         // Where the pointer is while the button is still down. After the release it may already be somewhere else.
         dragLocation = NSEvent.mouseLocation
-        guard let dragged = focusedWindow(), let last = applied[dragged.id], let now = dragged.element.frame,
+        guard let dragged = focusedWindow(), let last = applied[dragged.id], let now = dragged.frame,
               now != last.result, let group = lastGroups.first(where: { g in g.windows.contains { $0.id == dragged.id } }) else { return }
         userChangedTile = true
         // A changed size is a resize in progress: the group is rescaled once, when the button is released.
@@ -358,6 +378,9 @@ final class WindowManager {
 
     private func forgetClosedWindows(visible: Set<CGWindowID>) {
         applied = applied.filter { visible.contains($0.key) }
+        // Listing every window of every app is the most expensive call here, and stale ids do no harm for a while.
+        guard Date().timeIntervalSince(lastPrune) >= WindowManager.pruneInterval else { return }
+        lastPrune = Date()
         // Windows on other spaces still exist and keep their slot and their manual include or exclude.
         let existing = Set(windowOwners([.optionAll]).keys)
         let before = (included, excluded, order)
