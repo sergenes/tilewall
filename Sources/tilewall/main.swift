@@ -28,6 +28,7 @@ tilewall: tiles windows in a grid and grows the focused one to a quarter of the 
   tilewall untab            move every tab of the rule-matched apps into its own window
   tilewall retile | pause | resume | reload
   tilewall version
+  tilewall update           ask GitHub whether a newer release exists
 
 Config: \(Paths.config.path)
 """

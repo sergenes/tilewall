@@ -68,6 +68,10 @@ tilewall needs it to move and resize the windows of other apps, and starts tilin
 
 Launch at Login in the menu starts tilewall with your Mac.
 
+Once a day tilewall asks GitHub whether a newer release exists, and shows it at the top of the menu when there is one.
+It downloads nothing and sends nothing about you or your windows.
+Set `"checkForUpdates": false` in the config to switch that off; Check for Updates in the menu and `tilewall update` still work on request.
+
 To use the command line with the app, link its binary into your path:
 
 ```sh
@@ -115,6 +119,7 @@ tilewall send             # move the focused tile to the group of the next displ
 tilewall display          # list the displays
 tilewall display 2 off    # leave the windows on display 2 alone; `on` tiles them again
 tilewall pause            # also: resume, retile, reload, stop
+tilewall update           # ask GitHub whether a newer release exists
 ```
 
 ## More about groups
@@ -175,6 +180,7 @@ Run `tilewall reload` after editing it.
   "targetAspect": 1.5,
   "backdrop": "auto",
   "orientation": "landscape",
+  "checkForUpdates": true,
   "hotkeys": { "toggle": "ctrl+alt+t", "next": "ctrl+alt+d", "prev": "ctrl+alt+a", "forward": "ctrl+alt+shift+d", "back": "ctrl+alt+shift+a", "fill": "ctrl+alt+f", "send": "ctrl+alt+s", "retile": "ctrl+alt+r", "pause": "ctrl+alt+z", "help": "ctrl+alt+q" }
 }
 ```
@@ -196,6 +202,7 @@ Run `tilewall reload` after editing it.
   The backdrop fills the notches those corners leave, so with a color that matches the windows the corners disappear.
   Use `"#rrggbb"`, `"auto"` to follow the light or dark system appearance, or `"none"` to turn it off.
 - `orientation`: `"landscape"` grows the focused row, `"portrait"` grows the focused column.
+- `checkForUpdates`: `false` stops the daily question to GitHub about a newer release.
 - An empty hotkey string disables that hotkey.
 
 Any window of any app can be tiled by hand with `tilewall toggle`, whether a rule matches it or not.

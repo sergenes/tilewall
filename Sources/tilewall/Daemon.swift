@@ -46,6 +46,21 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.menu = menu
         registerHotkeys()
         waitForAccessibility()
+        scheduleUpdateChecks()
+    }
+
+    /// Once shortly after start and then daily. Only a released build has a version to compare.
+    private func scheduleUpdateChecks() {
+        guard Version.parts(App.version) != nil else { return }
+        let check = { [weak self] in
+            guard self?.manager.config.checkForUpdates == true else { return }
+            Updates.check { result in
+                if case .success(let release) = result, Updates.available != nil { log(Updates.describe(release)) }
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: check)
+        let daily = Timer.scheduledTimer(withTimeInterval: 24 * 60 * 60, repeats: true) { _ in check() }
+        daily.tolerance = 60 * 60
     }
 
     private func waitForAccessibility() {
@@ -120,6 +135,13 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             case "add" where !app.isEmpty: reply(manager.setRule(true, app: app))
             case "remove" where !app.isEmpty: reply(manager.setRule(false, app: app))
             default: reply("error: usage: tilewall rule [add|remove <app name or bundle id>]")
+            }
+        case "update":
+            Updates.check { result in
+                switch result {
+                case .success(let release): reply(Updates.describe(release))
+                case .failure(let error): reply("error: cannot check for updates: \(error.localizedDescription)")
+                }
             }
         case "retile": manager.retile(); reply("retiled")
         case "orientation":
@@ -221,6 +243,10 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let header = NSMenuItem(title: "Tilewall \(App.version), \(state)", action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
+        if let release = Updates.available {
+            add("Update Available: \(release.version)…", symbol: "arrow.down.circle",
+                hint: "Opens the release page on GitHub, where you can download it.", action: #selector(openUpdate))
+        }
 
         section("Tiles")
         add("Tile All", symbol: "square.grid.2x2", hint: "Tiles every window the rules match and undoes all manual excludes. Also resumes tiling.",
@@ -291,6 +317,8 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !App.supportURL.isEmpty {
             add("Support Tilewall…", symbol: "heart", hint: "Tilewall is free. This opens a page where you can support its development.", action: #selector(openSupport))
         }
+        add("Check for Updates…", symbol: "arrow.down.circle", hint: "Asks GitHub whether a newer release exists. Nothing is downloaded.",
+            action: #selector(checkForUpdates))
         add("Reload Config", symbol: "arrow.triangle.2.circlepath", hint: "Reads \(Paths.config.path) again after you edited it.", action: #selector(reloadConfig))
         if App.isBundled {
             add("Launch at Login", symbol: "power", hint: "Starts Tilewall when you log in.", action: #selector(toggleLogin), on: App.launchesAtLogin)
@@ -332,6 +360,28 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         alert.runModal()
     }
     @objc private func openSupport() { URL(string: App.supportURL).map { _ = NSWorkspace.shared.open($0) } }
+    @objc private func openUpdate() { Updates.available.map { _ = NSWorkspace.shared.open($0.page) } }
+    @objc private func checkForUpdates() {
+        Updates.check { result in
+            let alert = NSAlert()
+            switch result {
+            case .success(let release):
+                alert.messageText = Updates.available != nil ? "Tilewall \(release.version) is available" : "Tilewall is up to date"
+                alert.informativeText = Updates.available != nil
+                    ? "You have \(App.version). The release page has the download."
+                    : (Version.parts(App.version) == nil ? "This is a development build. The latest release is \(release.version)." : "\(App.version) is the latest release.")
+                if Updates.available != nil {
+                    alert.addButton(withTitle: "Open Release Page")
+                    alert.addButton(withTitle: "Later")
+                }
+            case .failure(let error):
+                alert.messageText = "Could not check for updates"
+                alert.informativeText = error.localizedDescription
+            }
+            NSApp.activate(ignoringOtherApps: true)
+            if alert.runModal() == .alertFirstButtonReturn, let release = Updates.available { NSWorkspace.shared.open(release.page) }
+        }
+    }
     @objc private func toggleLogin() { App.launchesAtLogin.toggle() }
     @objc private func toggleDisplay(_ sender: NSMenuItem) {
         guard menuDisplays.indices.contains(sender.tag) else { return }

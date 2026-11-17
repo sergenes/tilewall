@@ -107,6 +107,26 @@ final class TilesTests: XCTestCase {
         XCTAssertNil(Screens.next(after: "main", in: ["main"]))
     }
 
+    // MARK: Versions
+
+    func testNewerVersions() {
+        XCTAssertTrue(Version.isNewer("0.2.0", than: "0.1.0"))
+        XCTAssertTrue(Version.isNewer("v0.10.0", than: "0.9.3"))
+        XCTAssertTrue(Version.isNewer("1.0", than: "0.9.9"))
+        XCTAssertTrue(Version.isNewer("0.2.0.1", than: "0.2"))
+        XCTAssertFalse(Version.isNewer("0.2.0", than: "0.2.0"))
+        XCTAssertFalse(Version.isNewer("0.2", than: "0.2.0"))
+        XCTAssertFalse(Version.isNewer("0.1.9", than: "0.2.0"))
+    }
+
+    func testNonReleaseVersionsAreNeverNewer() {
+        XCTAssertNil(Version.parts("dev"))
+        XCTAssertNil(Version.parts("0.2.0-beta"))
+        XCTAssertNil(Version.parts(""))
+        XCTAssertFalse(Version.isNewer("0.2.0", than: "dev"))
+        XCTAssertFalse(Version.isNewer("latest", than: "0.1.0"))
+    }
+
     // MARK: Text
 
     func testLongTitlesAreCutInTheMiddle() {

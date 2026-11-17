@@ -52,6 +52,8 @@ public struct Config: Codable, Equatable {
     public var backdrop: String
     /// "landscape" lays tiles out in rows, "portrait" in columns.
     public var orientation: Orientation
+    /// Ask GitHub once a day whether a newer release exists. Nothing is downloaded.
+    public var checkForUpdates: Bool
 
     /// Terminal apps are tiled out of the box. An app that is not installed simply never matches.
     public static let defaultRules: [Rule] = [
@@ -80,7 +82,8 @@ public struct Config: Codable, Equatable {
         targetAspect: Double = 1.5,
         hotkeys: [String: String] = Config.defaultHotkeys,
         backdrop: String = "auto",
-        orientation: Orientation = .landscape
+        orientation: Orientation = .landscape,
+        checkForUpdates: Bool = true
     ) {
         self.rules = rules
         self.focusFraction = focusFraction
@@ -89,6 +92,7 @@ public struct Config: Codable, Equatable {
         self.hotkeys = hotkeys
         self.backdrop = backdrop
         self.orientation = orientation
+        self.checkForUpdates = checkForUpdates
     }
 
     public init(from decoder: Decoder) throws {
@@ -101,6 +105,7 @@ public struct Config: Codable, Equatable {
         hotkeys = defaults.hotkeys.merging(try c.decodeIfPresent([String: String].self, forKey: .hotkeys) ?? [:]) { _, new in new }
         backdrop = try c.decodeIfPresent(String.self, forKey: .backdrop) ?? defaults.backdrop
         orientation = try c.decodeIfPresent(Orientation.self, forKey: .orientation) ?? defaults.orientation
+        checkForUpdates = try c.decodeIfPresent(Bool.self, forKey: .checkForUpdates) ?? defaults.checkForUpdates
         guard focusFraction > 0, focusFraction <= 1 else {
             throw DecodingError.dataCorruptedError(forKey: .focusFraction, in: c, debugDescription: "focusFraction must be in (0, 1]")
         }
