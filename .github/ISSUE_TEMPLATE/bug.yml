@@ -1,0 +1,41 @@
+name: Bug report
+description: Something tilewall does wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what tilewall did.
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: Output of `tilewall status --all`
+      description: Window titles can be private. Replace them if you need to.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: tilewall version
+      description: From `tilewall version` or the first line of the menu.
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and Mac model
+      placeholder: macOS 15.5, MacBook Pro M3
+    validations:
+      required: true
+  - type: input
+    id: displays
+    attributes:
+      label: Displays
+      placeholder: built-in plus one external on the left
+  - type: input
+    id: app
+    attributes:
+      label: App whose windows are tiled
+      placeholder: Terminal, iTerm2, Ghostty
