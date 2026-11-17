@@ -4,7 +4,8 @@
 <h1 align="center">tilewall</h1>
 <p align="center">See all your agents at once.</p>
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.0-4f8ff7" alt="version 0.1.0">
+  <a href="https://github.com/sergenes/tilewall/releases/latest"><img src="https://img.shields.io/badge/version-0.2.0-4f8ff7" alt="version 0.2.0"></a>
+  <a href="https://github.com/sergenes/tilewall/actions/workflows/test.yml"><img src="https://github.com/sergenes/tilewall/actions/workflows/test.yml/badge.svg" alt="test status"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-5cc78f" alt="macOS 13 or later">
   <img src="https://img.shields.io/badge/Apple%20silicon%20%2B%20Intel-universal-9e80f0" alt="universal binary">
   <img src="https://img.shields.io/badge/license-MIT-fbcc47" alt="MIT license">

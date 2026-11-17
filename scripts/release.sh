@@ -75,12 +75,14 @@ xcrun stapler staple "$APP"
 spctl --assess --type execute --verbose=2 "$APP"
 
 echo "==> Building $DMG"
-STAGE="dist/dmg"
-mkdir -p "$STAGE"
-ditto "$APP" "$STAGE/tilewall.app"
-ln -s /Applications "$STAGE/Applications"
-hdiutil create -quiet -volname "tilewall $VERSION" -srcfolder "$STAGE" -fs HFS+ -format UDZO "$DMG"
-rm -rf "$STAGE"
+# dmgbuild lays out the window (app on the left, Applications on the right) without scripting Finder.
+# It lives in its own virtual environment under .build, created on first use.
+DMGBUILD=".build/dmgvenv/bin/dmgbuild"
+if [[ ! -x "$DMGBUILD" ]]; then
+    python3 -m venv .build/dmgvenv
+    .build/dmgvenv/bin/pip install --quiet "dmgbuild==2.0.0"
+fi
+"$DMGBUILD" -s scripts/dmg_settings.py -D app="$APP" "tilewall $VERSION" "$DMG" >/dev/null
 codesign --force --timestamp --sign "$DEVELOPER_ID" "$DMG"
 
 echo "==> Notarizing the disk image"
