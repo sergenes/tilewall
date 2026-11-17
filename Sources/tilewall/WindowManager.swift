@@ -36,10 +36,8 @@ private struct Group {
 final class WindowManager {
     private(set) var config: Config
     private(set) var paused = false
-    /// Windows added by hand that no rule matches.
-    private var included: Set<CGWindowID> = []
-    /// Windows a rule matches that were removed by hand.
-    private var excluded: Set<CGWindowID> = []
+    /// Which windows were added or taken out by hand.
+    private var membership = Membership()
     /// Stable tile order: first seen, first placed.
     private var order: [CGWindowID] = []
     private var lastFocus: [String: CGWindowID] = [:]
@@ -69,8 +67,7 @@ final class WindowManager {
     init(config: Config) {
         self.config = config
         if let data = try? Data(contentsOf: Paths.state), let saved = try? JSONDecoder().decode(SavedState.self, from: data) {
-            included = Set(saved.included)
-            excluded = Set(saved.excluded)
+            membership = Membership(included: Set(saved.included), excluded: Set(saved.excluded))
             order = saved.order ?? []
             areas = saved.displayAreas ?? [:]
             homes = saved.displayHomes ?? [:]
@@ -168,7 +165,7 @@ final class WindowManager {
     }
 
     private func isManaged(_ w: Window) -> Bool {
-        matchesRule(w) ? !excluded.contains(w.id) : included.contains(w.id)
+        membership.isTile(w.id, matchesRule: matchesRule(w))
     }
 
     /// Window id to owning process, for the windows the window server reports under these options.
@@ -187,7 +184,7 @@ final class WindowManager {
     /// With `candidatesOnly` only apps that can own a tile are queried, which keeps the periodic reconcile cheap.
     private func visibleWindows(candidatesOnly: Bool = false) -> [Window] {
         let onScreen = windowOwners([.optionOnScreenOnly, .excludeDesktopElements])
-        let includedPids = Set(included.compactMap { onScreen[$0] })
+        let includedPids = Set(membership.included.compactMap { onScreen[$0] })
         return NSWorkspace.shared.runningApplications
             .filter { $0.activationPolicy == .regular && !$0.isHidden && $0.processIdentifier != getpid() }
             .filter { app in
@@ -244,17 +241,8 @@ final class WindowManager {
 
     /// The display a window is on right now, judged by its center.
     private func display(of window: Window, in screens: [Display]) -> String? {
-        guard let frame = window.frame, !screens.isEmpty else { return nil }
-        let center = CGPoint(x: frame.midX, y: frame.midY)
-        return (screens.first { $0.area.contains(center) } ?? screens.min {
-            distance(center, to: $0.area) < distance(center, to: $1.area)
-        })?.id
-    }
-
-    private func distance(_ p: CGPoint, to r: CGRect) -> CGFloat {
-        let dx = max(r.minX - p.x, 0, p.x - r.maxX)
-        let dy = max(r.minY - p.y, 0, p.y - r.maxY)
-        return dx * dx + dy * dy
+        guard let frame = window.frame else { return nil }
+        return Screens.nearest(to: CGPoint(x: frame.midX, y: frame.midY), in: screens.map { ($0.id, $0.area) })
     }
 
     // MARK: Tiling
@@ -325,12 +313,11 @@ final class WindowManager {
         // Where the pointer is while the button is still down. After the release it may already be somewhere else.
         dragLocation = NSEvent.mouseLocation
         guard let dragged = focusedWindow(), let last = applied[dragged.id], let now = dragged.frame,
-              now != last.result, let group = lastGroups.first(where: { g in g.windows.contains { $0.id == dragged.id } }) else { return }
+              let group = lastGroups.first(where: { g in g.windows.contains { $0.id == dragged.id } }) else { return }
+        let change = TileChange.between(last.result, now)
+        guard change != .none else { return }
         userChangedTile = true
-        // A changed size is a resize in progress: the group is rescaled once, when the button is released.
-        guard abs(now.width - last.result.width) < 2, abs(now.height - last.result.height) < 2 else { return }
-        let dx = now.minX - last.result.minX
-        let dy = now.minY - last.result.minY
+        guard case .moved(let dx, let dy) = change else { return }
         areas[group.screen] = group.area.offsetBy(dx: dx, dy: dy)
         lastGroups = lastGroups.map { $0.screen == group.screen ? Group(screen: $0.screen, name: $0.name, area: $0.area.offsetBy(dx: dx, dy: dy), windows: $0.windows) : $0 }
         for window in group.windows {
@@ -353,14 +340,11 @@ final class WindowManager {
         let mouse = dragLocation ?? NSEvent.mouseLocation
         dragLocation = nil
         let drop = CGPoint(x: mouse.x, y: primary.frame.maxY - mouse.y)
-        let screens = screenAreas()
-        guard let target = screens.first(where: { $0.area.contains(drop) })
-                ?? screens.min(by: { distance(drop, to: $0.area) < distance(drop, to: $1.area) }),
-              target.id != group.screen else { return false }
-        for window in group.windows { homes[window.id] = target.id }
+        guard let target = Screens.nearest(to: drop, in: screenAreas().map { ($0.id, $0.area) }), target != group.screen else { return false }
+        for window in group.windows { homes[window.id] = target }
         // Both screens go back to full size: the tiles join whatever is already tiled on the target.
         areas[group.screen] = nil
-        areas[target.id] = nil
+        areas[target] = nil
         applied.removeAll()
         save()
         return true
@@ -383,16 +367,15 @@ final class WindowManager {
         lastPrune = Date()
         // Windows on other spaces still exist and keep their slot and their manual include or exclude.
         let existing = Set(windowOwners([.optionAll]).keys)
-        let before = (included, excluded, order)
+        let before = (membership, order)
         homes = homes.filter { existing.contains($0.key) }
         order.removeAll { !existing.contains($0) }
-        included.formIntersection(existing)
-        excluded.formIntersection(existing)
-        if before != (included, excluded, order) { save() }
+        membership.keep(existing)
+        if before != (membership, order) { save() }
     }
 
     private func save() {
-        let state = SavedState(included: included.sorted(), excluded: excluded.sorted(), order: order,
+        let state = SavedState(included: membership.included.sorted(), excluded: membership.excluded.sorted(), order: order,
                                displayAreas: areas, displayHomes: homes, untiledDisplays: untiled.sorted())
         do {
             try FileManager.default.createDirectory(at: Paths.home, withIntermediateDirectories: true)
@@ -438,11 +421,7 @@ final class WindowManager {
     func setManaged(_ include: Bool?, window: Window? = nil) -> String {
         guard let w = window ?? focusedWindow() else { return "error: no focused standard window" }
         let want = include ?? !isManaged(w)
-        if matchesRule(w) {
-            if want { excluded.remove(w.id) } else { excluded.insert(w.id) }
-        } else {
-            if want { included.insert(w.id) } else { included.remove(w.id) }
-        }
+        membership.set(want, id: w.id, matchesRule: matchesRule(w))
         save()
         applied.removeAll()
         retile()
@@ -473,17 +452,34 @@ final class WindowManager {
         let current = focusedWindow()?.id
         guard let group = groups.first(where: { g in g.windows.contains { $0.id == current } }) ?? groups.first,
               !group.windows.isEmpty else { return "error: no tiles" }
-        let n = group.windows.count
-        let index = group.windows.firstIndex { $0.id == current }.map { (($0 + step) % n + n) % n } ?? 0
+        guard let index = TileOrder.cycled(from: group.windows.firstIndex { $0.id == current }, by: step, count: group.windows.count) else { return "error: no tiles" }
         focus(group.windows[index])
         return "focused \(group.windows[index].id) \(group.windows[index].app): \(group.windows[index].title)"
+    }
+
+    /// Swaps a tile with its neighbour in the group, so it takes that slot. The focused tile when no id is given.
+    func move(_ step: Int, id: CGWindowID?) -> String {
+        let groups = tiles()
+        guard let wanted = id ?? focusedWindow()?.id,
+              let group = groups.first(where: { g in g.windows.contains { $0.id == wanted } }),
+              let w = group.windows.first(where: { $0.id == wanted }) else {
+            return id == nil ? "error: the focused window is not a tile" : "error: \(id!) is not a tile"
+        }
+        guard let moved = TileOrder.moving(wanted, by: step, in: group.windows.map(\.id), order: order) else {
+            return "error: \(w.id) is already the \(step < 0 ? "first" : "last") tile"
+        }
+        order = moved
+        save()
+        applied.removeAll()
+        retile()
+        return "moved \(w.id) \(w.app): \(w.title)"
     }
 
     func managedWindows() -> [Window] { tiles().flatMap(\.windows) }
 
     /// Tiles every window the rules match again, undoing all manual excludes, and resumes tiling.
     func tileAll() -> String {
-        excluded.removeAll()
+        membership.excluded.removeAll()
         paused = false
         save()
         applied.removeAll()
@@ -494,9 +490,7 @@ final class WindowManager {
     /// Releases every tile on the current space. The windows stay where they are and can be moved freely.
     func untileAll() -> String {
         let tiles = managedWindows()
-        for w in tiles {
-            if matchesRule(w) { excluded.insert(w.id) } else { included.remove(w.id) }
-        }
+        for w in tiles { membership.set(false, id: w.id, matchesRule: matchesRule(w)) }
         save()
         applied.removeAll()
         retile()
@@ -534,8 +528,9 @@ final class WindowManager {
         guard screens.count > 1 else { return "error: there is only one display" }
         // Start from where the window is shown now, which differs from its home while that display is unplugged.
         let shown = lastGroups.first { g in g.windows.contains { $0.id == w.id } }?.screen ?? display(of: w, in: screens)
-        let current = shown.flatMap { id in screens.firstIndex { $0.id == id } } ?? 0
-        let target = screens[(current + 1) % screens.count]
+        guard let next = Screens.next(after: shown, in: screens.map(\.id)), let target = screens.first(where: { $0.id == next }) else {
+            return "error: there is only one display"
+        }
         homes[w.id] = target.id
         if untiled.contains(target.id), let frame = w.element.frame {
             let size = CGSize(width: min(frame.width, target.area.width), height: min(frame.height, target.area.height))

@@ -105,6 +105,7 @@ tilewall none             # release every tile on the current space
 tilewall toggle           # include or exclude the focused window
 tilewall toggle 9154      # the same for a window id from `tilewall status --all`
 tilewall focus next       # also: prev, or a window id
+tilewall move next        # swap the focused tile with the next one; also: prev, and a window id
 tilewall orientation portrait   # the focused column grows instead of the focused row; `landscape` switches back
 tilewall fill             # make every group fill its screen again
 tilewall area -1700 100 1200 700   # place the focused group: x y width height, from the top left of the main display
@@ -152,6 +153,7 @@ The menu bar menu shows the current keys next to each action, and `tilewall guid
 |---|---|
 | ctrl+alt+t | include or exclude the focused window |
 | ctrl+alt+d / ctrl+alt+a | focus the next / previous tile |
+| ctrl+alt+shift+d / ctrl+alt+shift+a | move the focused tile forward / back one slot |
 | ctrl+alt+f | make every group fill its screen again |
 | ctrl+alt+s | send the focused tile to the next display |
 | ctrl+alt+r | retile now |
@@ -171,7 +173,7 @@ Run `tilewall reload` after editing it.
   "targetAspect": 1.5,
   "backdrop": "auto",
   "orientation": "landscape",
-  "hotkeys": { "toggle": "ctrl+alt+t", "next": "ctrl+alt+d", "prev": "ctrl+alt+a", "fill": "ctrl+alt+f", "send": "ctrl+alt+s", "retile": "ctrl+alt+r", "pause": "ctrl+alt+z", "help": "ctrl+alt+q" }
+  "hotkeys": { "toggle": "ctrl+alt+t", "next": "ctrl+alt+d", "prev": "ctrl+alt+a", "forward": "ctrl+alt+shift+d", "back": "ctrl+alt+shift+a", "fill": "ctrl+alt+f", "send": "ctrl+alt+s", "retile": "ctrl+alt+r", "pause": "ctrl+alt+z", "help": "ctrl+alt+q" }
 }
 ```
 
@@ -209,6 +211,8 @@ Any window of any app can be tiled by hand with `tilewall toggle`, whether a rul
 - Only the current space is tiled, and windows on other spaces keep their slot.
 - Minimized, hidden and full screen windows are skipped.
 - With three or fewer tiles the focused one is larger than a quarter, because there is nothing else to fill the screen.
+- Tiles sit in the order their windows were first seen.
+  `tilewall move next` and `tilewall move prev` swap a tile with its neighbour.
 - To take one window out of the group, exclude it with `tilewall toggle`.
 
 ## Layout of the code

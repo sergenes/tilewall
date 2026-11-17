@@ -53,6 +53,8 @@ public struct Config: Codable, Equatable {
         "toggle": "ctrl+alt+t",
         "next": "ctrl+alt+d",
         "prev": "ctrl+alt+a",
+        "forward": "ctrl+alt+shift+d",
+        "back": "ctrl+alt+shift+a",
         "fill": "ctrl+alt+f",
         "send": "ctrl+alt+s",
         "retile": "ctrl+alt+r",

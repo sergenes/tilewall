@@ -6,6 +6,8 @@ let hotkeyActions: [(name: String, title: String, detail: String)] = [
     ("toggle", "Include or Exclude Focused Window", "Adds the focused window to the tiles, or takes it out."),
     ("next", "Focus Next Tile", "Moves focus to the next tile, which then grows."),
     ("prev", "Focus Previous Tile", "Moves focus to the previous tile."),
+    ("forward", "Move Tile Forward", "Swaps the focused tile with the next one, so it takes that slot."),
+    ("back", "Move Tile Back", "Swaps the focused tile with the previous one."),
     ("fill", "Fill Screen", "Puts every group back to filling its whole screen."),
     ("send", "Send Tile to Next Display", "Moves the focused tile to the group on the next display."),
     ("retile", "Retile Now", "Lays the tiles out again."),

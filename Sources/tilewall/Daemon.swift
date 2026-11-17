@@ -68,6 +68,8 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case "toggle": _ = manager.setManaged(nil)
         case "next": _ = manager.cycle(1)
         case "prev": _ = manager.cycle(-1)
+        case "forward": _ = manager.move(1, id: nil)
+        case "back": _ = manager.move(-1, id: nil)
         case "fill": _ = manager.fillScreens()
         case "send": _ = manager.send(id: nil)
         case "retile": manager.retile()
@@ -104,6 +106,12 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             case "prev": reply(manager.cycle(-1))
             default: reply(id.map { manager.focus(id: $0) } ?? "error: usage: tilewall focus next|prev|<window id>")
             }
+        case "move":
+            let target = parts.count > 2 ? CGWindowID(parts[2]) : nil
+            guard (2...3).contains(parts.count), ["next", "prev"].contains(parts[1]), parts.count == 2 || target != nil else {
+                return reply("error: usage: tilewall move next|prev [<window id>]")
+            }
+            reply(manager.move(parts[1] == "next" ? 1 : -1, id: target))
         case "retile": manager.retile(); reply("retiled")
         case "orientation":
             guard parts.count == 2, let orientation = Orientation(rawValue: parts[1]) else {
@@ -213,6 +221,8 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         addAction("toggle", symbol: "plus.forwardslash.minus")
         addAction("next", symbol: "arrow.right")
         addAction("prev", symbol: "arrow.left")
+        addAction("forward", symbol: "arrow.right.to.line")
+        addAction("back", symbol: "arrow.left.to.line")
         if NSScreen.screens.count > 1 { addAction("send", symbol: "display.2") }
 
         section("Layout")
@@ -274,15 +284,12 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         add("Quit Tilewall", hint: "Stops tiling. Windows stay where they are.", action: #selector(quit))
     }
 
-    /// Menu titles are cut in the middle, because window titles tend to differ at the start and at the end.
     static func menuTitle(for window: Window, withApp: Bool, limit: Int = 48) -> String {
         var title = window.title.isEmpty ? window.app : window.title
         // A tmux client is best named by its session.
         if let session = TerminalSessions.session(inTitle: title) { title = session }
         if withApp, title != window.app { title = "\(window.app): \(title)" }
-        guard title.count > limit else { return title }
-        let head = (limit - 1) / 2
-        return String(title.prefix(head)) + "…" + String(title.suffix(limit - 1 - head))
+        return Text.middleTruncated(title, limit: limit)
     }
 
     static func keyEquivalent(_ key: String) -> String? {
