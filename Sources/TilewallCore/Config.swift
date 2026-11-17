@@ -16,9 +16,22 @@ public struct Rule: Codable, Equatable {
         let wanted = app.lowercased()
         guard bundleID?.lowercased() == wanted || appName?.lowercased() == wanted else { return false }
         guard let pattern = title, !pattern.isEmpty else { return true }
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return false }
+        guard let regex = Rule.regex(pattern) else { return false }
         let range = NSRange(windowTitle.startIndex..., in: windowTitle)
         return regex.firstMatch(in: windowTitle, range: range) != nil
+    }
+
+    private static let lock = NSLock()
+    private static var compiled: [String: NSRegularExpression?] = [:]
+
+    /// Title patterns are matched against every window on every retile, so each one is compiled once. Nil for an invalid pattern.
+    static func regex(_ pattern: String) -> NSRegularExpression? {
+        lock.lock()
+        defer { lock.unlock() }
+        if let known = compiled[pattern] { return known }
+        let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
+        compiled[pattern] = regex
+        return regex
     }
 }
 
@@ -102,7 +115,6 @@ public enum Paths {
 }
 
 public enum ConfigStore {
-    /// Loads the config, writing the defaults first when the file does not exist.
     public static func save(_ config: Config, to url: URL = Paths.config) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let encoder = JSONEncoder()
@@ -110,6 +122,7 @@ public enum ConfigStore {
         try encoder.encode(config).write(to: url, options: .atomic)
     }
 
+    /// Loads the config, writing the defaults first when the file does not exist.
     public static func load(from url: URL = Paths.config) throws -> Config {
         if !FileManager.default.fileExists(atPath: url.path) { try save(Config(), to: url) }
         return try JSONDecoder().decode(Config.self, from: Data(contentsOf: url))

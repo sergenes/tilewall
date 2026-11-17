@@ -40,7 +40,7 @@ enum IPC {
         return String(decoding: data, as: UTF8.self)
     }
 
-    /// Serves commands forever on a background thread. The handler runs on the main thread.
+    /// Serves commands forever on background threads. The handler runs on the main thread.
     static func serve(handler: @escaping (String, @escaping (String) -> Void) -> Void) throws {
         try FileManager.default.createDirectory(at: Paths.home, withIntermediateDirectories: true)
         unlink(Paths.socket.path)
@@ -57,23 +57,36 @@ enum IPC {
             while true {
                 let client = accept(fd, nil, nil)
                 guard client >= 0 else { continue }
-                var bytes: [UInt8] = []
-                var byte: UInt8 = 0
-                while bytes.count < 4096, read(client, &byte, 1) == 1, byte != UInt8(ascii: "\n") { bytes.append(byte) }
-                let command = String(decoding: bytes, as: UTF8.self)
-                let finished = DispatchSemaphore(value: 0)
-                var reply = ""
-                DispatchQueue.main.async {
-                    handler(command) {
-                        reply = $0
-                        finished.signal()
-                    }
-                }
-                finished.wait()
-                let out = Array((reply + "\n").utf8)
-                _ = write(client, out, out.count)
-                close(client)
+                // Each client gets its own thread, so a slow command or a silent client cannot block the others.
+                DispatchQueue.global(qos: .userInitiated).async { answer(client, handler: handler) }
             }
         }
+    }
+
+    private static func answer(_ client: Int32, handler: @escaping (String, @escaping (String) -> Void) -> Void) {
+        defer { close(client) }
+        var patience = timeval(tv_sec: 2, tv_usec: 0)
+        setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &patience, socklen_t(MemoryLayout<timeval>.size))
+        var bytes: [UInt8] = []
+        var byte: UInt8 = 0
+        var complete = false
+        while bytes.count < 4096, read(client, &byte, 1) == 1 {
+            if byte == UInt8(ascii: "\n") { complete = true; break }
+            bytes.append(byte)
+        }
+        // No full line within the timeout: not a tilewall client, or one that died.
+        guard complete else { return }
+        let command = String(decoding: bytes, as: UTF8.self)
+        let finished = DispatchSemaphore(value: 0)
+        var reply = ""
+        DispatchQueue.main.async {
+            handler(command) {
+                reply = $0
+                finished.signal()
+            }
+        }
+        finished.wait()
+        let out = Array((reply + "\n").utf8)
+        _ = write(client, out, out.count)
     }
 }
